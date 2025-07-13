@@ -1,40 +1,33 @@
 const navigations = [
-  { name: "Page 1", path: "/dashboard/default", icon: "dashboard" },
-  { label: "PAGES", type: "label" },
+  { label: "DSA Algorithms", type: "label" },
   {
-    name: "Session/Auth",
-    icon: "security",
+    name: "Arrays",
+    badge: { color: "secondary" },
     children: [
-      { name: "Sign in", iconText: "SI", path: "/session/signin" },
-      { name: "Sign up", iconText: "SU", path: "/session/signup" },
-      { name: "Forgot Password", iconText: "FP", path: "/session/forgot-password" },
-      { name: "Error", iconText: "404", path: "/session/404" }
-    ]
-  },
-  { label: "Components", type: "label" },
-  {
-    name: "Components",
-    icon: "favorite",
-    badge: { value: "5", color: "secondary" },
-    children: [
-      { name: "Page 3", path: "/material/autocomplete", iconText: "3" },
-      { name: "Page 4", path: "/material/buttons", iconText: "4" },
-      { name: "Page 5", path: "/material/checkbox", iconText: "5" },
-      { name: "Page 6", path: "/material/dialog", iconText: "6" },
-      { name: "Page 7", path: "/material/form", iconText: "7" }
+      { name: "Binary Search", path: "/components/arrays/Bsearch" },
+      { name: "Linear Search", path: "/components/arrays/Lsearch" },
+      { name: "Bubble Sort", path: "/components/arrays/BBS" },
+      { name: "Selection Sort", path: "/components/arrays/SLS" }
     ]
   },
   {
-    name: "Page 2",
-    icon: "trending_up",
-    children: [{ name: "Echarts", path: "/charts/echarts", iconText: "E" }]
+    name: "Trees",
+    badge: { color: "secondary" },
+    children: [
+      { name: "BFS", path: "/components/trees/BFS" },
+      { name: "DFS", path: "/components/trees/DFS" },
+      { name: "DLS", path: "/components/trees/DLS" }
+    ]
   },
   {
-    name: "Documentation",
-    icon: "launch",
-    type: "extLink",
-    path: "http://demos.ui-lib.com/matx-react-doc/"
-  }
+    name: "Stacks",
+    badge: { color: "secondary" },
+    children: [
+      { name: "Stack Operations", path: "/components/Stacks/Operations" },
+      { name: "Infix to Postfix", path: "/components/Stacks/INPO" },
+      { name: "Merge Two Sorted Linked Lists", path: "/components/Stacks/Merge" }
+    ]
+  },
 ];
 
 export default navigations;
