@@ -91,7 +91,7 @@ const DLS_template = () => {
     return (
       <div>
         <Navbar setActivePage={setActivePage} showExamples={showExamples} setShowExamples={setShowExamples} />
-        <div style={{textAlign:"center", fontSize:"20px", marginTop:"10px"}}><b>DEPTH FIRST SEARCH</b></div>
+        <div style={{textAlign:"center", fontSize:"20px", marginTop:"10px"}}><b>DEPTH LIMITED SEARCH</b></div>
         <div>{renderContent()}</div>
       </div>
     );

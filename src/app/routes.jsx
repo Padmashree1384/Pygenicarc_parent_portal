@@ -17,6 +17,7 @@ import BBS_template from "./components/DSA/Arrays/Bubble_sort/BBS_template";
 import SLS_template from "./components/DSA/Arrays/Selection_sort/SLS_template";
 import ST_template from "./components/DSA/Stacks/Stack_operation/ST_template";
 import INPO_template from "./components/DSA/Stacks/Infix-Postfix/INPO_template";
+import QOP_template from "./components/DSA/Queues/Queue-operations/QOP_template";
 import sessionRoutes from "./views/sessions/session-routes";
 
 const routes = [
@@ -42,7 +43,8 @@ const routes = [
       { path: "/components/trees/DLS", element: <DLS_template /> },
       { path: "/components/Stacks/Operations", element: <ST_template /> },
       { path: "/components/Stacks/INPO", element: <INPO_template /> },
-      { path: "/components/Linked-List/Merge", element: <Demo /> }
+      { path: "/components/Linked-List/Merge", element: <Demo /> },
+      { path: "/components/Queue/Operations", element: <QOP_template /> }
     ]
   },
 

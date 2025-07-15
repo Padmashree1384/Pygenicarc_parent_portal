@@ -28,6 +28,13 @@ const navigations = [
       { name: "Merge Two Sorted Linked Lists", path: "/components/Stacks/Merge" }
     ]
   },
+  {
+    name: "Queue",
+    badge: { color: "secondary" },
+    children: [
+      { name: "Queue Operations", path: "/components/Queue/Operations" }
+    ]
+  }
 ];
 
 export default navigations;
