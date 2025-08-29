@@ -19,8 +19,6 @@ import {
   Typography,
   Paper,
   Grid,
-  Snackbar,
-  Alert,
   Stack,
   ThemeProvider,
   createTheme,
@@ -70,13 +68,13 @@ const theme = createTheme({
       main: '#673ab7',
     },
     success: {
-        main: '#4CAF50'
+      main: '#4CAF50'
     },
     warning: {
-        main: '#FFC107'
+      main: '#FFC107'
     },
     error: {
-        main: '#d32f2f'
+      main: '#d32f2f'
     },
     background: {
       default: '#f7f9fc',
@@ -105,11 +103,12 @@ const theme = createTheme({
 });
 
 
-const DFSLab = () => {
+const DFSLab = ({ showSnackbar }) => {
   // --- Refs ---
   const successAudioRef = useRef(null);
   const failAudioRef = useRef(null);
   const stepAudioRef = useRef(null);
+  const logContainerRef = useRef(null);
 
 
   // React Flow State
@@ -128,19 +127,18 @@ const DFSLab = () => {
   const [history, setHistory] = useState([]);
 
   // UI State
-  const [targetValue, setTargetValue] = useState(""); // MODIFIED
+  const [targetValue, setTargetValue] = useState("");
   const [layoutMode, setLayoutMode] = useState('auto');
   const [nodeCount, setNodeCount] = useState(7);
   const [nodeValues, setNodeValues] = useState(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
   const [edgesInput, setEdgesInput] = useState([
-      { parent: '0', child: '1' }, { parent: '0', child: '2' },
-      { parent: '1', child: '3' }, { parent: '1', child: '4' },
-      { parent: '2', child: '5' }, { parent: '2', child: '6' }
+    { parent: '0', child: '1' }, { parent: '0', child: '2' },
+    { parent: '1', child: '3' }, { parent: '1', child: '4' },
+    { parent: '2', child: '5' }, { parent: '2', child: '6' }
   ]);
   const [statusMessage, setStatusMessage] = useState('Status: Build a tree to start.');
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [animationSpeed] = useState(600);
-  const [isTreeBuilt, setIsTreeBuilt] = useState(false); // ADDED
+  const [isTreeBuilt, setIsTreeBuilt] = useState(false);
 
   // --- Audio Logic ---
   const playSound = (type) => {
@@ -148,26 +146,18 @@ const DFSLab = () => {
     if (type === 'success') audioRef = successAudioRef;
     else if (type === 'failure') audioRef = failAudioRef;
     else audioRef = stepAudioRef;
-  
+
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(error => console.error("Audio play failed:", error));
     }
   };
-  
-  // --- Utility Functions ---
-  const showSnackbar = (message, severity) => {
-    setSnackbar({ open: true, message, severity });
-  };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-  
+  // --- Utility Functions ---
   const appendToLog = (message) => {
-      setTraversalLog(prev => prev + message);
+    setTraversalLog(prev => prev + message);
   }
-  
+
   const simulationTimeout = useTimeout(performStep, animationSpeed);
 
   // --- Simulation Control Handlers ---
@@ -185,7 +175,7 @@ const DFSLab = () => {
     setStatusMessage('Status: Ready');
     setNodes(nds => nds.map(n => ({ ...n, style: {} })));
     setEdges(eds => eds.map(e => ({ ...e, style: {}, animated: false })));
-    setIsTreeBuilt(false); // MODIFIED
+    setIsTreeBuilt(false);
   }, [setNodes, setEdges, simulationTimeout]);
 
   // --- Tree Building Logic ---
@@ -194,12 +184,12 @@ const DFSLab = () => {
       showSnackbar("Please enter a valid number of nodes.", 'error');
       return;
     }
-    
+
     resetSimulation();
 
     let newNodes = [];
     let newEdges = [];
-    
+
     newNodes = Array.from({ length: nodeCount }, (_, i) => ({
       id: `${i}`,
       data: { label: nodeValues[i] || `N${i}` },
@@ -213,10 +203,10 @@ const DFSLab = () => {
           source: `${edge.parent}`,
           target: `${edge.child}`,
         }))
-        .filter(e => 
-            e.source && e.target &&
-            !isNaN(parseInt(e.source)) && !isNaN(parseInt(e.target)) &&
-            parseInt(e.source) < nodeCount && parseInt(e.target) < nodeCount
+        .filter(e =>
+          e.source && e.target &&
+          !isNaN(parseInt(e.source)) && !isNaN(parseInt(e.target)) &&
+          parseInt(e.source) < nodeCount && parseInt(e.target) < nodeCount
         );
     } else {
       for (let i = 0; i < nodeCount; i++) {
@@ -239,176 +229,176 @@ const DFSLab = () => {
     });
 
     const rootNodeId = newNodes.find(n => inDegree.get(n.id) === 0)?.id || (newNodes.length > 0 ? '0' : null);
-    
+
     const levels = new Map();
     const positionedNodeIds = new Set();
-    
+
     const assignLevels = (nodeId, depth) => {
-        if (!nodeId || positionedNodeIds.has(nodeId)) return;
-        if (!levels.has(depth)) levels.set(depth, []);
-        levels.get(depth).push(nodeId);
-        positionedNodeIds.add(nodeId);
-        const children = adjacency.get(nodeId) || [];
-        children.forEach(childId => assignLevels(childId, depth + 1));
+      if (!nodeId || positionedNodeIds.has(nodeId)) return;
+      if (!levels.has(depth)) levels.set(depth, []);
+      levels.get(depth).push(nodeId);
+      positionedNodeIds.add(nodeId);
+      const children = adjacency.get(nodeId) || [];
+      children.forEach(childId => assignLevels(childId, depth + 1));
     };
-    
-    if(rootNodeId) assignLevels(rootNodeId, 0);
+
+    if (rootNodeId) assignLevels(rootNodeId, 0);
 
     const positionedNodes = newNodes.map(node => {
-        for(const [level, nodesInLevel] of levels.entries()){
-            const nodeIndex = nodesInLevel.indexOf(node.id);
-            if(nodeIndex !== -1){
-                const y = level * 100;
-                const x = (nodeIndex - (nodesInLevel.length - 1) / 2) * 150;
-                return {...node, position: {x, y}};
-            }
+      for (const [level, nodesInLevel] of levels.entries()) {
+        const nodeIndex = nodesInLevel.indexOf(node.id);
+        if (nodeIndex !== -1) {
+          const y = level * 100;
+          const x = (nodeIndex - (nodesInLevel.length - 1) / 2) * 150;
+          return { ...node, position: { x, y } };
         }
-        return {...node, position: {x: Math.random() * 200, y: Math.random() * 200}};
+      }
+      return { ...node, position: { x: Math.random() * 200, y: Math.random() * 200 } };
     });
 
     setNodes(positionedNodes);
     setEdges(newEdges);
     setStatusMessage("✅ Tree built. Ready to search!");
     showSnackbar("✅ Tree built successfully!", 'success');
-    setIsTreeBuilt(true); // MODIFIED
-  }, [nodeCount, nodeValues, edgesInput, layoutMode, resetSimulation]);
+    setIsTreeBuilt(true);
+  }, [nodeCount, nodeValues, edgesInput, layoutMode, resetSimulation, showSnackbar]);
 
   // --- Simulation Core Logic ---
   function performStep() {
-      setHistory(prev => [...prev, { simulationStack, visitedSet, currentNodeId, traversalLog, stepCounter, statusMessage, isFinished }]);
+    setHistory(prev => [...prev, { simulationStack, visitedSet, currentNodeId, traversalLog, stepCounter, statusMessage, isFinished }]);
 
-      playSound('step');
-      if (simulationStack.length === 0) {
-          const foundNode = nodes.find(n => n.data.label === targetValue);
-          const wasFound = foundNode && visitedSet.has(foundNode.id);
-          const finalMessage = wasFound ? `✅ Found: ${targetValue}` : `❌ Target '${targetValue}' not found.`;
-          
-          if (wasFound) playSound('success'); else playSound('failure');
+    playSound('step');
+    if (simulationStack.length === 0) {
+      const foundNode = nodes.find(n => n.data.label === targetValue);
+      const wasFound = foundNode && visitedSet.has(foundNode.id);
+      const finalMessage = wasFound ? `✅ Found: ${targetValue}` : `❌ Target '${targetValue}' not found.`;
 
-          setStatusMessage(finalMessage);
-          appendToLog(`\n${finalMessage}`);
-          setIsRunning(false);
-          setIsFinished(true);
-          setCurrentNodeId(null);
-          return;
-      }
+      if (wasFound) playSound('success'); else playSound('failure');
 
-      const newStack = [...simulationStack];
-      const nodeId = newStack.pop();
-      const node = nodes.find(n => n.id === nodeId);
-      
-      setCurrentNodeId(nodeId);
-      setStatusMessage(`Popped ${node.data.label} from stack.`);
+      setStatusMessage(finalMessage);
+      appendToLog(`\n${finalMessage}`);
+      setIsRunning(false);
+      setIsFinished(true);
+      setCurrentNodeId(null);
+      return;
+    }
 
-      if (visitedSet.has(nodeId)) {
-          appendToLog(`Step ${stepCounter}: Node ${node.data.label} already visited. Skipping.\n`);
-          setStepCounter(c => c + 1);
-          setSimulationStack(newStack);
-          return;
-      }
+    const newStack = [...simulationStack];
+    const nodeId = newStack.pop();
+    const node = nodes.find(n => n.id === nodeId);
 
-      const newVisited = new Set(visitedSet).add(nodeId);
-      setVisitedSet(newVisited);
-      appendToLog(`Step ${stepCounter}: Visiting ${node.data.label}.\n`);
+    setCurrentNodeId(nodeId);
+    setStatusMessage(`Popped ${node.data.label} from stack.`);
+
+    if (visitedSet.has(nodeId)) {
+      appendToLog(`Step ${stepCounter}: Node ${node.data.label} already visited. Skipping.\n`);
       setStepCounter(c => c + 1);
-
-      if (node.data.label === targetValue) {
-          simulationTimeout.clear();
-          playSound('success');
-          setStatusMessage(`✅ Found: ${targetValue}!`);
-          appendToLog(`Target found! Halting simulation.\n`);
-          setIsRunning(false);
-          setIsFinished(true);
-          return;
-      }
-
-      const children = edges
-          .filter(e => e.source === nodeId)
-          .map(e => e.target)
-          .reverse();
-
-      let childrenLog = 'Pushing to stack: ';
-      let pushedSomething = false;
-      children.forEach(childId => {
-          if (!newVisited.has(childId)) {
-              newStack.push(childId);
-              const childNode = nodes.find(n => n.id === childId);
-              childrenLog += `${childNode.data.label} `;
-              pushedSomething = true;
-          }
-      });
-      
-      if(pushedSomething) {
-          appendToLog(childrenLog + '\n');
-      } else {
-          appendToLog('No unvisited children to push.\n');
-      }
-
       setSimulationStack(newStack);
+      return;
+    }
+
+    const newVisited = new Set(visitedSet).add(nodeId);
+    setVisitedSet(newVisited);
+    appendToLog(`Step ${stepCounter}: Visiting ${node.data.label}.\n`);
+    setStepCounter(c => c + 1);
+
+    if (node.data.label === targetValue) {
+      simulationTimeout.clear();
+      playSound('success');
+      setStatusMessage(`✅ Found: ${targetValue}!`);
+      appendToLog(`Target found! Halting simulation.\n`);
+      setIsRunning(false);
+      setIsFinished(true);
+      return;
+    }
+
+    const children = edges
+      .filter(e => e.source === nodeId)
+      .map(e => e.target)
+      .reverse();
+
+    let childrenLog = 'Pushing to stack: ';
+    let pushedSomething = false;
+    children.forEach(childId => {
+      if (!newVisited.has(childId)) {
+        newStack.push(childId);
+        const childNode = nodes.find(n => n.id === childId);
+        childrenLog += `${childNode.data.label} `;
+        pushedSomething = true;
+      }
+    });
+
+    if (pushedSomething) {
+      appendToLog(childrenLog + '\n');
+    } else {
+      appendToLog('No unvisited children to push.\n');
+    }
+
+    setSimulationStack(newStack);
   };
 
   useEffect(() => {
-      if (isRunning && !isFinished) {
-          simulationTimeout.set();
-      }
-      if (isStepping) {
-          performStep();
-          setIsStepping(false);
-          setIsRunning(false);
-      }
+    if (isRunning && !isFinished) {
+      simulationTimeout.set();
+    }
+    if (isStepping) {
+      performStep();
+      setIsStepping(false);
+      setIsRunning(false);
+    }
   }, [isRunning, isFinished, simulationStack, isStepping]);
 
-  
+
   const handleRunPause = () => {
-    if (isTreeBuilt && !targetValue.trim()) { // MODIFIED
-        showSnackbar("Please enter a search target first.", 'error'); // MODIFIED
-        return;
+    if (isTreeBuilt && !targetValue.trim()) {
+      showSnackbar("Please enter a search target first.", 'error');
+      return;
     }
     if (nodes.length === 0) {
-        showSnackbar("Please build a tree first.", 'warning');
-        return;
+      showSnackbar("Please build a tree first.", 'warning');
+      return;
     }
     if (isFinished) {
-        showSnackbar("Search is complete. Please reset.", 'info');
-        return;
+      showSnackbar("Search is complete. Please reset.", 'info');
+      return;
     }
 
     if (isRunning) {
-        simulationTimeout.clear();
-        setStatusMessage(`Status: Paused at Step ${stepCounter - 1}`);
+      simulationTimeout.clear();
+      setStatusMessage(`Status: Paused at Step ${stepCounter - 1}`);
     } else {
-        if (simulationStack.length === 0 && visitedSet.size === 0) {
-           setSimulationStack([nodes[0].id]);
-        }
-        setStatusMessage('Status: Running...');
+      if (simulationStack.length === 0 && visitedSet.size === 0) {
+        setSimulationStack([nodes[0].id]);
+      }
+      setStatusMessage('Status: Running...');
     }
     setIsRunning(!isRunning);
   };
 
   const handleStep = () => {
-      if (isTreeBuilt && !targetValue.trim()) { // MODIFIED
-        showSnackbar("Please enter a search target first.", 'error'); // MODIFIED
-        return;
-      }
-      if (nodes.length === 0) {
-        showSnackbar("Please build a tree first.", 'warning');
-        return;
-      }
-      if (isFinished) {
-          showSnackbar("Search is complete. Please reset.", 'info');
-          return;
-      }
-      simulationTimeout.clear();
-      setIsRunning(false);
-      if (simulationStack.length === 0 && visitedSet.size === 0) {
-          setSimulationStack([nodes[0].id]);
-      }
-      setIsStepping(true);
+    if (isTreeBuilt && !targetValue.trim()) {
+      showSnackbar("Please enter a search target first.", 'error');
+      return;
+    }
+    if (nodes.length === 0) {
+      showSnackbar("Please build a tree first.", 'warning');
+      return;
+    }
+    if (isFinished) {
+      showSnackbar("Search is complete. Please reset.", 'info');
+      return;
+    }
+    simulationTimeout.clear();
+    setIsRunning(false);
+    if (simulationStack.length === 0 && visitedSet.size === 0) {
+      setSimulationStack([nodes[0].id]);
+    }
+    setIsStepping(true);
   };
 
   const handlePrevStep = () => {
     if (history.length === 0) return;
-    
+
     simulationTimeout.clear();
     const lastState = history[history.length - 1];
 
@@ -423,7 +413,7 @@ const DFSLab = () => {
 
     setHistory(prev => prev.slice(0, -1));
   };
-  
+
   // --- Style updates based on state ---
   useEffect(() => {
     setNodes(nds =>
@@ -433,9 +423,9 @@ const DFSLab = () => {
         const isFound = isVisited && node.data.label === targetValue && targetValue.trim() !== '';
 
         const style = {
-            transition: 'all 0.5s ease',
-            border: '2px solid #555',
-            borderRadius: '50%',
+          transition: 'all 0.5s ease',
+          border: '2px solid #555',
+          borderRadius: '50%',
         };
         if (isFound) {
           style.backgroundColor = '#4CAF50';
@@ -455,15 +445,21 @@ const DFSLab = () => {
       })
     );
     setEdges(eds => eds.map(edge => ({
-        ...edge,
-        animated: edge.source === currentNodeId && !visitedSet.has(edge.target),
-        style: {
-            stroke: (visitedSet.has(edge.source) && visitedSet.has(edge.target)) ? '#1976D2' : '#b1b1b7',
-            strokeWidth: 2.5,
-        }
-      })))
+      ...edge,
+      animated: edge.source === currentNodeId && !visitedSet.has(edge.target),
+      style: {
+        stroke: (visitedSet.has(edge.source) && visitedSet.has(edge.target)) ? '#1976D2' : '#b1b1b7',
+        strokeWidth: 2.5,
+      }
+    })))
   }, [currentNodeId, visitedSet, setNodes, setEdges, targetValue]);
-  
+
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [traversalLog]);
+
   // --- UI Handlers ---
   const handleNodeCountChange = (event) => {
     const count = Math.min(parseInt(event.target.value) || 0, 15);
@@ -487,112 +483,107 @@ const DFSLab = () => {
         <audio ref={failAudioRef} src="/fail.mp3" preload="auto"></audio>
 
         <Typography variant="h5" align="center" sx={{ mb: 2 }}>
-            Simulator
+          Simulator
         </Typography>
 
         <Paper sx={{ p: 2, mb: 3 }}>
-            <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={isTreeBuilt ? 3 : 4}>
-                    <FormControl fullWidth size="small">
-                        <InputLabel>Layout</InputLabel>
-                        <Select value={layoutMode} label="Layout" onChange={(e) => setLayoutMode(e.target.value)}>
-                            <MenuItem value="auto">Auto (Binary Tree)</MenuItem>
-                            <MenuItem value="manual">Manual Edges</MenuItem>
-                        </Select>
-                    </FormControl>
-                </Grid>
-                <Grid item xs={12} md={isTreeBuilt ? 3 : 4}>
-                    <TextField fullWidth size="small" label="Number of Nodes" type="number" value={nodeCount} onChange={handleNodeCountChange} inputProps={{ min: 1, max: 15 }} />
-                </Grid>
-                {isTreeBuilt && (
-                    <Grid item xs={12} md={3}>
-                        <TextField fullWidth size="small" label="Search Target" value={targetValue} onChange={(e) => setTargetValue(e.target.value.toUpperCase())} />
-                    </Grid>
-                )}
-                <Grid item xs={12} md={isTreeBuilt ? 3 : 4}>
-                     <Button fullWidth variant="contained" startIcon={<BuildIcon />} onClick={handleBuildTree}>Build Tree</Button>
-                </Grid>
-                {layoutMode === 'manual' && (
-                    <Grid item xs={12}>
-                        <Box sx={{ maxHeight: '150px', overflowY: 'auto', p: 1.5, border: '1px solid #e0e0e0', borderRadius: 2 }}>
-                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'medium' }}>Edges (Parent → Child)</Typography>
-                            <Grid container spacing={2}>
-                                {Array.from({ length: nodeCount > 1 ? nodeCount - 1 : 0 }).map((_, i) => (
-                                <Grid item xs={6} sm={4} md={3} key={i}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <TextField label="Parent" type="number" value={edgesInput[i]?.parent || ''} onChange={e => {
-                                            const newEdges = [...edgesInput]; if(!newEdges[i]) newEdges[i] = {}; newEdges[i].parent = e.target.value; setEdgesInput(newEdges);
-                                        }} size="small" />
-                                        <Typography>→</Typography>
-                                        <TextField label="Child" type="number" value={edgesInput[i]?.child || ''} onChange={e => {
-                                            const newEdges = [...edgesInput]; if(!newEdges[i]) newEdges[i] = {}; newEdges[i].child = e.target.value; setEdgesInput(newEdges);
-                                        }} size="small" />
-                                    </Stack>
-                                </Grid>
-                                ))}
-                            </Grid>
-                        </Box>
-                    </Grid>
-                )}
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={isTreeBuilt ? 3 : 4}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Layout</InputLabel>
+                <Select value={layoutMode} label="Layout" onChange={(e) => setLayoutMode(e.target.value)}>
+                  <MenuItem value="auto">Auto (Binary Tree)</MenuItem>
+                  <MenuItem value="manual">Manual Edges</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
+            <Grid item xs={12} md={isTreeBuilt ? 3 : 4}>
+              <TextField fullWidth size="small" label="Number of Nodes" type="number" value={nodeCount} onChange={handleNodeCountChange} inputProps={{ min: 1, max: 15 }} />
+            </Grid>
+            {isTreeBuilt && (
+              <Grid item xs={12} md={3}>
+                <TextField fullWidth size="small" label="Search Target" value={targetValue} onChange={(e) => setTargetValue(e.target.value.toUpperCase())} />
+              </Grid>
+            )}
+            <Grid item xs={12} md={isTreeBuilt ? 3 : 4}>
+              <Button fullWidth variant="contained" startIcon={<BuildIcon />} onClick={handleBuildTree}>Build Tree</Button>
+            </Grid>
+            {layoutMode === 'manual' && (
+              <Grid item xs={12}>
+                <Box sx={{ maxHeight: '150px', overflowY: 'auto', p: 1.5, border: '1px solid #e0e0e0', borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'medium' }}>Edges (Parent → Child)</Typography>
+                  <Grid container spacing={2}>
+                    {Array.from({ length: nodeCount > 1 ? nodeCount - 1 : 0 }).map((_, i) => (
+                      <Grid item xs={6} sm={4} md={3} key={i}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <TextField label="Parent" type="number" value={edgesInput[i]?.parent || ''} onChange={e => {
+                            const newEdges = [...edgesInput]; if (!newEdges[i]) newEdges[i] = {}; newEdges[i].parent = e.target.value; setEdgesInput(newEdges);
+                          }} size="small" />
+                          <Typography>→</Typography>
+                          <TextField label="Child" type="number" value={edgesInput[i]?.child || ''} onChange={e => {
+                            const newEdges = [...edgesInput]; if (!newEdges[i]) newEdges[i] = {}; newEdges[i].child = e.target.value; setEdgesInput(newEdges);
+                          }} size="small" />
+                        </Stack>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              </Grid>
+            )}
+          </Grid>
         </Paper>
 
         <Grid container spacing={3} alignItems="stretch">
-            <Grid item xs={12} md={7}>
-                <Paper sx={{ height: '100%', p: 1.5, minHeight: 500 }}>
-                    <ReactFlowProvider>
-                        <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} fitView>
-                            <Controls showInteractive={false} />
-                            <Background />
-                        </ReactFlow>
-                    </ReactFlowProvider>
-                </Paper>
-            </Grid>
-
-            <Grid item xs={12} md={5}>
-                 <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1, flexShrink: 0 }}>
-                        <Typography variant="h6">Log & Status</Typography>
-                        <Stack direction="row" spacing={0.5}>
-                            <Tooltip title="Reset"><IconButton size="small" onClick={resetSimulation}><ReplayIcon /></IconButton></Tooltip>
-                            <Tooltip title="Previous Step"><IconButton size="small" onClick={handlePrevStep} disabled={history.length === 0}><ArrowBackIcon /></IconButton></Tooltip>
-                            <Tooltip title="Next Step"><IconButton size="small" onClick={handleStep} disabled={isRunning}><ArrowForwardIcon /></IconButton></Tooltip>
-                            <Tooltip title={isRunning ? "Pause" : "Run"}>
-                                <IconButton size="small" onClick={handleRunPause} sx={{ background: isRunning ? theme.palette.warning.light : theme.palette.success.light }}>
-                                    {isRunning ? <PauseIcon /> : <PlayArrowIcon />}
-                                </IconButton>
-                            </Tooltip>
-                        </Stack>
-                    </Stack>
-                    <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', fontStyle: 'italic', flexShrink: 0 }}>{statusMessage}</Typography>
-                    <Box sx={{ flexGrow: 1, minHeight: 200, bgcolor: '#fafafa', borderRadius: 1, p: 1, border: '1px solid #eee' }}>
-                         <TextField
-                            value={traversalLog}
-                            multiline
-                            fullWidth
-                            readOnly
-                            variant="standard"
-                            sx={{
-                                height: '100%',
-                                '& .MuiInputBase-root': { height: '100%', alignItems: 'flex-start' },
-                                '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.8rem', overflowY: 'auto !important', height: '100% !important' }
-                            }}
-                            InputProps={{ disableUnderline: true }}
-                         />
-                    </Box>
-                    <Button variant="contained" color="secondary" size="small" startIcon={<ContentCopyIcon />} onClick={handleCopySteps} sx={{ mt: 1.5, flexShrink: 0 }}>
-                        Copy Log
-                    </Button>
-                 </Paper>
-            </Grid>
+          <Grid item xs={12} md={7}>
+            <Paper sx={{ height: '100%', p: 1.5, minHeight: 500 }}>
+              <ReactFlowProvider>
+                <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} fitView>
+                  <Controls showInteractive={false} />
+                  <Background />
+                </ReactFlow>
+              </ReactFlowProvider>
+            </Paper>
           </Grid>
 
-          <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-              {snackbar.message}
-            </Alert>
-          </Snackbar>
-        </Box>
+          <Grid item xs={12} md={5}>
+            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1, flexShrink: 0 }}>
+                <Typography variant="h6">Log & Status</Typography>
+                <Stack direction="row" spacing={0.5}>
+                  <Tooltip title="Reset"><IconButton size="small" onClick={resetSimulation}><ReplayIcon /></IconButton></Tooltip>
+                  <Tooltip title="Previous Step"><IconButton size="small" onClick={handlePrevStep} disabled={history.length === 0}><ArrowBackIcon /></IconButton></Tooltip>
+                  <Tooltip title="Next Step"><IconButton size="small" onClick={handleStep} disabled={isRunning}><ArrowForwardIcon /></IconButton></Tooltip>
+                  <Tooltip title={isRunning ? "Pause" : "Run"}>
+                    <IconButton size="small" onClick={handleRunPause} sx={{ background: isRunning ? theme.palette.warning.light : theme.palette.success.light }}>
+                      {isRunning ? <PauseIcon /> : <PlayArrowIcon />}
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Stack>
+              <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', fontStyle: 'italic', flexShrink: 0 }}>{statusMessage}</Typography>
+              <Box sx={{ flexGrow: 1, minHeight: 200, bgcolor: '#fafafa', borderRadius: 1, p: 1, border: '1px solid #eee' }}>
+                <TextField
+                  inputRef={logContainerRef}
+                  value={traversalLog}
+                  multiline
+                  fullWidth
+                  readOnly
+                  variant="standard"
+                  sx={{
+                    height: '100%',
+                    '& .MuiInputBase-root': { height: '100%', alignItems: 'flex-start' },
+                    '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.8rem', overflowY: 'auto !important', height: '100% !important' }
+                  }}
+                  InputProps={{ disableUnderline: true }}
+                />
+              </Box>
+              <Button variant="contained" color="secondary" size="small" startIcon={<ContentCopyIcon />} onClick={handleCopySteps} sx={{ mt: 1.5, flexShrink: 0 }}>
+                Copy Log
+              </Button>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
     </ThemeProvider>
   );
 };

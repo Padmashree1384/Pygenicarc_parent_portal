@@ -3,8 +3,6 @@ import Editor from '@monaco-editor/react';
 import { DFScodeSnippets } from './DFScodeSnippets';
 import {
   Box,
-  Snackbar,
-  Alert,
   Typography,
   Tabs,
   Tab,
@@ -14,18 +12,15 @@ import {
   Fade,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
-// REMOVED: import RefreshIcon from '@mui/icons-material/Refresh';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'; // ADDED: Icon for copy button
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CodeIcon from '@mui/icons-material/Code';
 
 // Helper function to handle code actions
-const handleCodeAction = (action, code, originalCode, language, setCode, setSnackbarMessage, setSnackbarSeverity, setOpenSnackbar) => {
+const handleCodeAction = (action, code, language, showSnackbar) => {
   switch (action) {
     case 'download':
       if (!code) {
-        setSnackbarMessage('❌ No code to download.');
-        setSnackbarSeverity('error');
-        setOpenSnackbar(true);
+        showSnackbar('❌ No code to download.', 'error');
         return;
       }
       const blob = new Blob([code], { type: 'text/plain' });
@@ -37,28 +32,19 @@ const handleCodeAction = (action, code, originalCode, language, setCode, setSnac
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setSnackbarMessage('✅ Code downloaded successfully!');
-      setSnackbarSeverity('success');
-      setOpenSnackbar(true);
+      showSnackbar('✅ Code downloaded successfully!', 'success');
       break;
 
-    // MODIFIED: 'reset' case changed to 'copy'
     case 'copy':
       if (!code) {
-        setSnackbarMessage('❌ No code to copy.');
-        setSnackbarSeverity('error');
-        setOpenSnackbar(true);
+        showSnackbar('❌ No code to copy.', 'error');
         return;
       }
       navigator.clipboard.writeText(code).then(() => {
-        setSnackbarMessage('✅ Code copied to clipboard!');
-        setSnackbarSeverity('success');
-        setOpenSnackbar(true);
+        showSnackbar('✅ Code copied to clipboard!', 'success');
       }).catch(err => {
         console.error('Failed to copy code: ', err);
-        setSnackbarMessage('❌ Failed to copy code.');
-        setSnackbarSeverity('error');
-        setOpenSnackbar(true);
+        showSnackbar('❌ Failed to copy code.', 'error');
       });
       break;
 
@@ -78,13 +64,10 @@ const getFileExtension = (language) => {
   return extensions[language] || 'txt';
 };
 
-const DFS_Monoco_Enhanced = () => {
+const DFS_Monoco_Enhanced = ({ showSnackbar }) => {
   const [language, setLanguage] = useState('python');
   const [code, setCode] = useState(DFScodeSnippets['python']);
   const [originalCode, setOriginalCode] = useState(DFScodeSnippets['python']);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
   useEffect(() => {
     const selectedCode = DFScodeSnippets[language];
@@ -94,13 +77,6 @@ const DFS_Monoco_Enhanced = () => {
 
   const handleTabChange = (event, newValue) => {
     setLanguage(newValue);
-  };
-
-  const handleCloseSnackbar = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setOpenSnackbar(false);
   };
 
   return (
@@ -117,7 +93,6 @@ const DFS_Monoco_Enhanced = () => {
           border: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >
-        {/* Enhanced Header */}
         <Box sx={{ p: { xs: 2, md: 4 }, textAlign: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
             <CodeIcon sx={{ fontSize: { xs: 30, md: 40 }, color: '#64ffda', mr: 2, textShadow: '0 0 10px #64ffda' }} />
@@ -130,7 +105,6 @@ const DFS_Monoco_Enhanced = () => {
           </Typography>
         </Box>
 
-        {/* Unified Control Bar */}
         <Box
           sx={{
             display: 'flex',
@@ -181,16 +155,15 @@ const DFS_Monoco_Enhanced = () => {
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Download Code">
               <IconButton
-                onClick={() => handleCodeAction('download', code, originalCode, language, setCode, setSnackbarMessage, setSnackbarSeverity, setOpenSnackbar)}
+                onClick={() => handleCodeAction('download', code, language, showSnackbar)}
                 sx={{ color: '#94a3b8', '&:hover': { color: '#64ffda', background: 'rgba(100, 255, 218, 0.1)' } }}
               >
                 <DownloadIcon />
               </IconButton>
             </Tooltip>
-            {/* MODIFIED: Reset button changed to Copy button */}
             <Tooltip title="Copy Code">
               <IconButton
-                onClick={() => handleCodeAction('copy', code, originalCode, language, setCode, setSnackbarMessage, setSnackbarSeverity, setOpenSnackbar)}
+                onClick={() => handleCodeAction('copy', code, language, showSnackbar)}
                 sx={{ color: '#94a3b8', '&:hover': { color: '#64ffda', background: 'rgba(100, 255, 218, 0.1)' } }}
               >
                 <ContentCopyIcon />
@@ -199,7 +172,6 @@ const DFS_Monoco_Enhanced = () => {
           </Box>
         </Box>
 
-        {/* Dark-themed Editor Container */}
         <Box
           sx={{
             height: '600px',
@@ -220,14 +192,13 @@ const DFS_Monoco_Enhanced = () => {
             height="100%"
             language={language}
             value={code}
-            // MODIFIED: onChange is not needed for read-only editor but kept to prevent breaking changes if you revert.
             onChange={(value) => setCode(value ?? '')}
             theme="vs-dark"
             options={{
               fontSize: 16,
               minimap: { enabled: true, scale: 2 },
               scrollBeyondLastLine: false,
-              readOnly: true, // MODIFIED: Editor is now read-only
+              readOnly: true,
               wordWrap: 'on',
               padding: { top: 24, bottom: 24 },
               fontFamily: "'Fira Code', 'Roboto Mono', monospace",
@@ -239,23 +210,6 @@ const DFS_Monoco_Enhanced = () => {
             }}
           />
         </Box>
-
-        {/* Themed Snackbar */}
-        <Snackbar
-          open={openSnackbar}
-          autoHideDuration={3000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert
-            onClose={handleCloseSnackbar}
-            severity={snackbarSeverity}
-            variant="filled"
-            sx={{ width: '100%', borderRadius: '8px' }}
-          >
-            {snackbarMessage}
-          </Alert>
-        </Snackbar>
       </Paper>
     </Fade>
   );

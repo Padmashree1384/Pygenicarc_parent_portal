@@ -1,25 +1,25 @@
-<h1><a href="https://ui-lib.com/downloads/matx-react-dashboard/">Matx React Material Design Admin Dashboard Template</a></h1>
+<h1><a href="https://ui-lib.com/downloads/Parc-react-dashboard/">Parc React Material Design Admin Dashboard Template</a></h1>
 
-<a href="https://matx-react-free.netlify.app/">
-  <img alt="Matx React Admin" src="https://ui-lib.com/blog/wp-content/uploads/2021/09/matx-github.png" />
+<a href="https://Parc-react-free.netlify.app/">
+  <img alt="Parc React Admin" src="https://ui-lib.com/blog/wp-content/uploads/2021/09/Parc-github.png" />
 </a>
 
-<p>MatX is a full-featured React Material UI Admin Dashboard template. MatX is built with React, Redux & Material UI We implemented all the features you might need to start a new Web application. The free version includes all Material UI components, Form elements, and validation, JWT authentication, Sign in, sign up pages,  Vertical navigation, Lazy loading, Code splitting.</p>
+<p>Parc is a full-featured React Material UI Admin Dashboard template. Parc is built with React, Redux & Material UI We implemented all the features you might need to start a new Web application. The free version includes all Material UI components, Form elements, and validation, JWT authentication, Sign in, sign up pages,  Vertical navigation, Lazy loading, Code splitting.</p>
 
 <h2>Features</h2>
 <table>
 <tr>
-<th>MatX Free</th>
-<th>MatX Pro</th>
+<th>Parc Free</th>
+<th>Parc Pro</th>
 </tr>
 <tr>
 <td>
-<a href="https://matx-react-free.netlify.app/">Live Preview</a> <br>
-<a href="https://ui-lib.com/downloads/matx-react-dashboard/">Download MatX</a>
+<a href="https://Parc-react-free.netlify.app/">Live Preview</a> <br>
+<a href="https://ui-lib.com/downloads/Parc-react-dashboard/">Download Parc</a>
 </td>
 <td>
-<a href="https://matx-react-pro.vercel.app">Live Preview</a> <br>
-<a href="https://ui-lib.com/downloads/matx-pro-react-admin/">Get MatX Pro</a>
+<a href="https://Parc-react-pro.vercel.app">Live Preview</a> <br>
+<a href="https://ui-lib.com/downloads/Parc-pro-react-admin/">Get Parc Pro</a>
 </td>
 </tr>
 <tr>
@@ -77,7 +77,7 @@
 </td>
 <td valign="top">
 <ul>
-  <li>All features of Matx free +</li>
+  <li>All features of Parc free +</li>
   <li>Firebase authentication</li>
   <li>Auth0 authentication</li>
   <li>Horizontal navigation</li>
@@ -181,6 +181,6 @@ It correctly bundles React in production mode and optimizes the build for the be
 Your app is ready to be deployed!</p>
 
 <h3>Download</h3>
-Download From <a href="https://ui-lib.com/downloads/matx-react-dashboard/">official website</a>
+Download From <a href="https://ui-lib.com/downloads/Parc-react-dashboard/">official website</a>
 
 <h3>For questions and support mail us at <a href="mailto:support@ui-lib.com">support@ui-lib.com</a></h3>

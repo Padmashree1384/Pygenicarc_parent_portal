@@ -1,474 +1,630 @@
-import React, { useEffect, useRef, useState } from 'react';
-import p5 from 'p5';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import ReactFlow, {
+  ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
+  Controls,
+  Background,
+} from 'react-flow-renderer';
 
-class Node {
-  constructor(value, x, y) {
-    this.value = value;
-    this.x = x;
-    this.y = y;
-    this.children = [];
-    this.visited = false;
-    this.found = false;
-    this.visitOrder = null;
-    this.depth = 0;
-  }
-}
+// Material UI Imports
+import {
+  Box,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Typography,
+  Paper,
+  Grid,
+  Stack,
+  ThemeProvider,
+  createTheme,
+  IconButton,
+  Tooltip
+} from '@mui/material';
 
-const DLSLab = () => {
-  const canvasRef = useRef();
-  const statusRef = useRef();
-  const inputRef = useRef();
-  const depthLimitInputRef = useRef();
-  const textareaRef = useRef();
-  const toastRef = useRef();
-  const stepSound = useRef();
-  const successSound = useRef();
-  const failSound = useRef();
+// Material UI Icons
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ReplayIcon from '@mui/icons-material/Replay';
+import BuildIcon from '@mui/icons-material/Build';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
-  const p5Instance = useRef(null);
-  const nodes = useRef([]);
-  const history = useRef([]);
-  const visitCounter = useRef(1);
-  const stepNumber = useRef(1);
-  const stack = useRef([]);
-  const running = useRef(false);
-  const paused = useRef(false);
-  const searchComplete = useRef(false);
-  const current = useRef(null);
-  const target = useRef("F");
-  const depthLimit = useRef(2);
-  const [layoutMode, setLayoutMode] = useState('manual');
-  const root = useRef(null);
+// A custom hook for managing the simulation timeout
+const useTimeout = (callback, delay) => {
+  const callbackRef = React.useRef(callback);
+  const timeoutRef = React.useRef();
 
   useEffect(() => {
-    if (canvasRef.current && !canvasRef.current.hasChildNodes()) {
-      stepSound.current = new Audio('/step.mp3');
-      successSound.current = new Audio('/success.mp3');
-      failSound.current = new Audio('/fail.mp3');
+    callbackRef.current = callback;
+  }, [callback]);
 
-      const sketch = (p) => {
-        p.setup = () => {
-          const cnv = p.createCanvas(800, 500);
-          cnv.parent(canvasRef.current);
-        };
+  const set = useCallback(() => {
+    timeoutRef.current = setTimeout(() => callbackRef.current(), delay);
+  }, [delay]);
 
-        p.draw = () => {
-          p.background(255);
-          drawEdges(p);
-          drawNodes(p);
-          if (running.current && !paused.current && !searchComplete.current) {
-            if (stack.current.length > 0) {
-              dlsStep();
-            } else {
-              if (!searchComplete.current) {
-                const targetNode = nodes.current.find(n => n.value === target.current);
-                if (targetNode && targetNode.depth <= depthLimit.current) {
-                  done(`❌ ${target.current} not found.`);
-                } else {
-                  done(`⚠️ Cutoff Failure: ${target.current} not found within depth limit ${depthLimit.current}.`);
-                }
-              }
-              playSound(failSound);
-            }
-          }
-        };
-      };
-
-      p5Instance.current = new p5(sketch, canvasRef.current);
-    }
-
-    return () => {
-      if (p5Instance.current) { 
-        p5Instance.current.remove(); 
-        p5Instance.current = null;
-      }
-    };
+  const clear = useCallback(() => {
+    timeoutRef.current && clearTimeout(timeoutRef.current);
   }, []);
 
-  const drawEdges = (p) => {
-    p.stroke(150);
-    p.strokeWeight(2);
-    nodes.current.forEach(node => {
-      node.children.forEach(child => {
-        p.line(node.x, node.y, child.x, child.y);
-      });
-    });
+  useEffect(() => {
+    return clear;
+  }, [delay, set, clear]);
+
+  return { set, clear };
+};
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#673ab7',
+    },
+    success: {
+      main: '#4CAF50'
+    },
+    warning: {
+      main: '#FFC107'
+    },
+    info: {
+      main: '#9E9E9E'
+    },
+    error: {
+      main: '#d32f2f'
+    },
+    background: {
+      default: '#f7f9fc',
+      paper: '#ffffff',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h5: {
+      fontWeight: 700,
+    },
+    h6: {
+      fontWeight: 600,
+    },
+  },
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.05)',
+          borderRadius: '16px',
+        },
+      },
+    },
+  },
+});
+
+
+const DLSLab = ({ showSnackbar }) => {
+  // --- Refs ---
+  const successAudioRef = useRef(null);
+  const failAudioRef = useRef(null);
+  const stepAudioRef = useRef(null);
+  const logContainerRef = useRef(null);
+
+  // React Flow State
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Simulation State
+  const [isRunning, setIsRunning] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
+  const [simulationStack, setSimulationStack] = useState([]);
+  const [visitedSet, setVisitedSet] = useState(new Set());
+  const [currentNodeId, setCurrentNodeId] = useState(null);
+  const [traversalLog, setTraversalLog] = useState('');
+  const [stepCounter, setStepCounter] = useState(1);
+  const [isStepping, setIsStepping] = useState(false);
+  const [history, setHistory] = useState([]);
+
+  // UI State
+  const [targetValue, setTargetValue] = useState("");
+  const [depthLimit, setDepthLimit] = useState(2);
+  const [layoutMode, setLayoutMode] = useState('auto');
+  const [nodeCount, setNodeCount] = useState(7);
+  const [nodeValues, setNodeValues] = useState(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+  const [edgesInput, setEdgesInput] = useState([
+    { parent: '0', child: '1' }, { parent: '0', child: '2' },
+    { parent: '1', child: '3' }, { parent: '1', child: '4' },
+    { parent: '2', child: '5' }, { parent: '2', child: '6' }
+  ]);
+  const [statusMessage, setStatusMessage] = useState('Status: Build a tree to start.');
+  const [animationSpeed] = useState(600);
+  const [isTreeBuilt, setIsTreeBuilt] = useState(false);
+
+  // --- Audio Logic ---
+  const playSound = (type) => {
+    let audioRef;
+    if (type === 'success') audioRef = successAudioRef;
+    else if (type === 'failure') audioRef = failAudioRef;
+    else audioRef = stepAudioRef;
+
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(error => console.error("Audio play failed:", error));
+    }
   };
 
-  const drawNodes = (p) => {
-    p.textAlign(p.CENTER, p.CENTER);
-    p.textSize(14);
-    
-    nodes.current.forEach(node => {
-      if (node.found) p.fill(0, 255, 0);
-      else if (node === current.current) p.fill(255, 204, 0);
-      else if (node.visited) p.fill(100, 200, 255);
-      else p.fill(230);
+  // --- Utility Functions ---
+  const appendToLog = (message) => {
+    setTraversalLog(prev => prev + message);
+  }
 
-      p.stroke(0);
-      p.ellipse(node.x, node.y, 50, 50);
-      p.fill(0);
-      p.noStroke();
-      const text = node.visitOrder !== null ? `${node.value} (${node.visitOrder})` : node.value;
-      p.text(text, node.x, node.y);
+  const simulationTimeout = useTimeout(performStep, animationSpeed);
 
-      p.textSize(10);
-      p.fill(100);
-      p.text(`D: ${node.depth}`, node.x, node.y + 30);
-      p.textSize(14);
-    });
-  };
+  // --- Simulation Control Handlers ---
+  const resetSimulation = useCallback(() => {
+    simulationTimeout.clear();
+    setIsRunning(false);
+    setIsFinished(false);
+    setIsStepping(false);
+    setSimulationStack([]);
+    setVisitedSet(new Set());
+    setTraversalLog('');
+    setStepCounter(1);
+    setCurrentNodeId(null);
+    setHistory([]);
+    setStatusMessage('Status: Ready');
+    setNodes(nds => nds.map(n => ({ ...n, style: {} })));
+    setEdges(eds => eds.map(e => ({ ...e, style: {}, animated: false })));
+    setIsTreeBuilt(false);
+  }, [setNodes, setEdges, simulationTimeout]);
 
-  const createTree = (count, values, edges) => {
-    const nodeList = Array.from({ length: count }, (_, i) => ({
-      value: values[i] || `N${i}`,
-      x: 0, y: 0,
-      children: [],
-      visited: false,
-      found: false,
-      visitOrder: null,
-      depth: 0
+  // --- Tree Building Logic ---
+  const handleBuildTree = useCallback(() => {
+    if (nodeCount <= 0) {
+      showSnackbar("Please enter a valid number of nodes.", 'error');
+      return;
+    }
+
+    resetSimulation();
+
+    let newNodes = [];
+    let newEdges = [];
+
+    newNodes = Array.from({ length: nodeCount }, (_, i) => ({
+      id: `${i}`,
+      data: { label: nodeValues[i] || `N${i}`, depth: 0 },
+      position: { x: 0, y: 0 },
     }));
 
-    edges.forEach(([p, c]) => {
-      if (nodeList[p] && nodeList[c]) {
-        nodeList[p].children.push(nodeList[c]);
-      }
-    });
-
-    const rootNode = nodeList[0];
-    const levels = {};
-    const assignLevels = (node, depth) => {
-      if (!levels[depth]) levels[depth] = [];
-      levels[depth].push(node);
-      node.depth = depth;
-      node.children.forEach(child => assignLevels(child, depth + 1));
-    };
-    assignLevels(rootNode, 0);
-
-    Object.entries(levels).forEach(([level, levelNodes]) => {
-      const spacing = 600 / (levelNodes.length + 1);
-      levelNodes.forEach((node, i) => {
-        node.x = 100 + spacing * (i + 1);
-        node.y = 100 + parseInt(level) * 100;
-      });
-    });
-
-    nodes.current = nodeList;
-    root.current = rootNode;
-    resetTraversal();
-    statusRef.current.innerText = "✅ Tree built. Ready to search!";
-  };
-
-  const resetTraversal = () => {
-    if (root.current) {
-      stack.current = [root.current];
+    if (layoutMode === 'manual') {
+      newEdges = edgesInput
+        .map(edge => ({
+          id: `e${edge.parent}-${edge.child}`,
+          source: `${edge.parent}`,
+          target: `${edge.child}`,
+        }))
+        .filter(e =>
+          e.source && e.target &&
+          !isNaN(parseInt(e.source)) && !isNaN(parseInt(e.target)) &&
+          parseInt(e.source) < nodeCount && parseInt(e.target) < nodeCount
+        );
     } else {
-      stack.current = [];
-    }
-    current.current = null;
-    visitCounter.current = 1;
-    stepNumber.current = 1;
-    running.current = false;
-    paused.current = false;
-    searchComplete.current = false;
-    history.current = [];
-    nodes.current.forEach(n => {
-      n.visited = false;
-      n.found = false;
-      n.visitOrder = null;
-    });
-    textareaRef.current.value = '';
-    statusRef.current.innerText = 'Status: Ready';
-  };
-
-  const dlsStep = () => {
-    if (stack.current.length === 0) {
-      return;
-    }
-
-    history.current.push({
-      nodes: nodes.current.map(n => ({ ...n })),
-      stack: [...stack.current],
-      current: current.current,
-      visitCounter: visitCounter.current,
-      stepNumber: stepNumber.current,
-      stepText: textareaRef.current.value
-    });
-
-    current.current = stack.current.pop();
-
-    if (current.current.depth > depthLimit.current) {
-      logStep(`Skipping ${current.current.value} (Depth ${current.current.depth} > Limit ${depthLimit.current})`);
-      playSound(stepSound);
-      current.current = null;
-      return;
-    }
-
-    if (!current.current.visited) {
-      current.current.visited = true;
-      current.current.visitOrder = visitCounter.current++;
-      
-      if (current.current.value === target.current) {
-        current.current.found = true;
-        done(`✅ Found: ${target.current} at depth ${current.current.depth}`);
-        playSound(successSound);
-        return;
-      }
-
-      logStep(`Visiting ${current.current.value} (Depth: ${current.current.depth})`);
-      playSound(stepSound);
-
-      for (let i = current.current.children.length - 1; i >= 0; i--) {
-        const child = current.current.children[i];
-        if (!child.visited && (child.depth + 1) <= depthLimit.current) {
-          stack.current.push(child);
-        } else if (!child.visited && (child.depth + 1) > depthLimit.current) {
-          logStep(`Not adding ${child.value} (Depth ${child.depth + 1}) to stack: Exceeds limit ${depthLimit.current}`);
+      for (let i = 0; i < nodeCount; i++) {
+        const leftChild = 2 * i + 1;
+        const rightChild = 2 * i + 2;
+        if (leftChild < nodeCount) {
+          newEdges.push({ id: `e${i}-${leftChild}`, source: `${i}`, target: `${leftChild}` });
+        }
+        if (rightChild < nodeCount) {
+          newEdges.push({ id: `e${i}-${rightChild}`, source: `${i}`, target: `${rightChild}` });
         }
       }
     }
-  };
 
-  const done = (msg) => {
-    statusRef.current.innerText = msg;
-    logStep(msg);
-    current.current = null;
-    searchComplete.current = true;
-    running.current = false;
-  };
+    const adjacency = new Map(newNodes.map(n => [n.id, []]));
+    const inDegree = new Map(newNodes.map(n => [n.id, 0]));
+    newEdges.forEach(edge => {
+      adjacency.set(edge.source, [...(adjacency.get(edge.source) || []), edge.target]);
+      inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
+    });
 
-  const logStep = (text) => {
-    textareaRef.current.value += `Step ${stepNumber.current++}: ${text}\n`;
-  };
+    const rootNodeId = newNodes.find(n => inDegree.get(n.id) === 0)?.id || (newNodes.length > 0 ? '0' : null);
 
-  const playSound = (ref) => {
-    if (ref.current) {
-      ref.current.currentTime = 0;
-      ref.current.play();
+    const levels = new Map();
+    const positionedNodeIds = new Set();
+
+    const assignLevels = (nodeId, depth) => {
+      if (!nodeId || positionedNodeIds.has(nodeId)) return;
+      if (!levels.has(depth)) levels.set(depth, []);
+      levels.get(depth).push(nodeId);
+      positionedNodeIds.add(nodeId);
+
+      const node = newNodes.find(n => n.id === nodeId);
+      if (node) node.data.depth = depth;
+
+      const children = adjacency.get(nodeId) || [];
+      children.forEach(childId => assignLevels(childId, depth + 1));
+    };
+
+    if (rootNodeId) assignLevels(rootNodeId, 0);
+
+    const positionedNodes = newNodes.map(node => {
+      for (const [level, nodesInLevel] of levels.entries()) {
+        const nodeIndex = nodesInLevel.indexOf(node.id);
+        if (nodeIndex !== -1) {
+          const y = level * 100;
+          const x = (nodeIndex - (nodesInLevel.length - 1) / 2) * 150;
+          return { ...node, position: { x, y } };
+        }
+      }
+      return { ...node, position: { x: Math.random() * 200, y: Math.random() * 200 } };
+    });
+
+    setNodes(positionedNodes);
+    setEdges(newEdges);
+    setStatusMessage("✅ Tree built. Ready to search!");
+    showSnackbar("✅ Tree built successfully!", 'success');
+    setIsTreeBuilt(true);
+  }, [nodeCount, nodeValues, edgesInput, layoutMode, resetSimulation, showSnackbar]);
+
+  // --- Simulation Core Logic (DLS) ---
+  function performStep() {
+    setHistory(prev => [...prev, { simulationStack, visitedSet, currentNodeId, traversalLog, stepCounter, statusMessage, isFinished }]);
+
+    playSound('step');
+    if (simulationStack.length === 0) {
+      const wasFound = nodes.some(n => n.data.label === targetValue && visitedSet.has(n.id));
+      let finalMessage;
+
+      if (wasFound) {
+        finalMessage = `✅ Found: ${targetValue}`;
+        playSound('success');
+      } else {
+        const targetExists = nodes.find(n => n.data.label === targetValue);
+        if (targetExists && targetExists.data.depth > depthLimit) {
+          finalMessage = `⚠️ Cutoff Failure: '${targetValue}' exists but is beyond depth limit ${depthLimit}.`;
+        } else {
+          finalMessage = `❌ Target '${targetValue}' not found.`;
+        }
+        playSound('failure');
+      }
+
+      setStatusMessage(finalMessage);
+      appendToLog(`\n${finalMessage}`);
+      setIsRunning(false);
+      setIsFinished(true);
+      setCurrentNodeId(null);
+      return;
     }
-  };
 
-  const handleCreate = () => {
-    nodes.current = [];
-    root.current = null;
-    
-    if (p5Instance.current) {
-      p5Instance.current.clear(); 
-      p5Instance.current.background(255); 
+    const newStack = [...simulationStack];
+    const nodeId = newStack.pop();
+    const node = nodes.find(n => n.id === nodeId);
+
+    setCurrentNodeId(nodeId);
+
+    if (node.data.depth > depthLimit) {
+      setStatusMessage(`Depth limit exceeded at ${node.data.label}.`);
+      appendToLog(`Step ${stepCounter}: Node ${node.data.label} (depth ${node.data.depth}) exceeds limit ${depthLimit}. Cutoff.\n`);
+      setStepCounter(c => c + 1);
+      setVisitedSet(prev => new Set(prev).add(nodeId));
+      setSimulationStack(newStack);
+      return;
     }
 
-    const count = parseInt(document.getElementById("nodeCount").value);
-    const values = Array.from({ length: count }, (_, i) =>
-      document.getElementById(`nodeVal${i}`).value.toUpperCase() || `N${i}`
+    setStatusMessage(`Popped ${node.data.label} from stack.`);
+
+    if (visitedSet.has(nodeId)) {
+      appendToLog(`Step ${stepCounter}: Node ${node.data.label} already visited. Skipping.\n`);
+      setStepCounter(c => c + 1);
+      setSimulationStack(newStack);
+      return;
+    }
+
+    const newVisited = new Set(visitedSet).add(nodeId);
+    setVisitedSet(newVisited);
+    appendToLog(`Step ${stepCounter}: Visiting ${node.data.label}.\n`);
+    setStepCounter(c => c + 1);
+
+    if (node.data.label === targetValue) {
+      simulationTimeout.clear();
+      playSound('success');
+      setStatusMessage(`✅ Found: ${targetValue}!`);
+      appendToLog(`Target found! Halting simulation.\n`);
+      setIsRunning(false);
+      setIsFinished(true);
+      return;
+    }
+
+    const children = edges
+      .filter(e => e.source === nodeId)
+      .map(e => e.target)
+      .reverse();
+
+    let childrenLog = 'Pushing to stack: ';
+    let pushedSomething = false;
+    children.forEach(childId => {
+      const childNode = nodes.find(n => n.id === childId);
+      if (!newVisited.has(childId) && childNode.data.depth <= depthLimit) {
+        newStack.push(childId);
+        childrenLog += `${childNode.data.label} `;
+        pushedSomething = true;
+      }
+    });
+
+    if (pushedSomething) {
+      appendToLog(childrenLog + '\n');
+    } else {
+      appendToLog('No unvisited children to push within depth limit.\n');
+    }
+
+    setSimulationStack(newStack);
+  };
+
+  useEffect(() => {
+    if (isRunning && !isFinished) {
+      simulationTimeout.set();
+    }
+    if (isStepping) {
+      performStep();
+      setIsStepping(false);
+      setIsRunning(false);
+    }
+  }, [isRunning, isFinished, simulationStack, isStepping]);
+
+
+  const handleRunPause = () => {
+    if (isTreeBuilt && !targetValue.trim()) {
+      showSnackbar("Please enter a search target first.", 'error');
+      return;
+    }
+    if (nodes.length === 0) {
+      showSnackbar("Please build a tree first.", 'warning');
+      return;
+    }
+    if (isFinished) {
+      showSnackbar("Search is complete. Please reset.", 'info');
+      return;
+    }
+
+    if (isRunning) {
+      simulationTimeout.clear();
+      setStatusMessage(`Status: Paused at Step ${stepCounter - 1}`);
+    } else {
+      if (simulationStack.length === 0 && visitedSet.size === 0) {
+        const rootNode = nodes.find(n => n.data.depth === 0);
+        if (rootNode) setSimulationStack([rootNode.id]);
+      }
+      setStatusMessage('Status: Running...');
+    }
+    setIsRunning(!isRunning);
+  };
+
+  const handleStep = () => {
+    if (isTreeBuilt && !targetValue.trim()) {
+      showSnackbar("Please enter a search target first.", 'error');
+      return;
+    }
+    if (nodes.length === 0) {
+      showSnackbar("Please build a tree first.", 'warning');
+      return;
+    }
+    if (isFinished) {
+      showSnackbar("Search is complete. Please reset.", 'info');
+      return;
+    }
+    simulationTimeout.clear();
+    setIsRunning(false);
+    if (simulationStack.length === 0 && visitedSet.size === 0) {
+      const rootNode = nodes.find(n => n.data.depth === 0);
+      if (rootNode) setSimulationStack([rootNode.id]);
+    }
+    setIsStepping(true);
+  };
+
+  const handlePrevStep = () => {
+    if (history.length === 0) return;
+
+    simulationTimeout.clear();
+    const lastState = history[history.length - 1];
+
+    setSimulationStack(lastState.simulationStack);
+    setVisitedSet(lastState.visitedSet);
+    setCurrentNodeId(lastState.currentNodeId);
+    setTraversalLog(lastState.traversalLog);
+    setStepCounter(lastState.stepCounter);
+    setStatusMessage(lastState.statusMessage);
+    setIsFinished(lastState.isFinished);
+    setIsRunning(false);
+
+    setHistory(prev => prev.slice(0, -1));
+  };
+
+  // --- Style updates based on state ---
+  useEffect(() => {
+    setNodes(nds =>
+      nds.map(node => {
+        const isCurrent = node.id === currentNodeId;
+        const isVisited = visitedSet.has(node.id);
+        const isFound = isVisited && node.data.label === targetValue && targetValue.trim() !== '';
+        const isCutoff = isVisited && node.data.depth > depthLimit;
+
+        const style = {
+          transition: 'all 0.5s ease',
+          border: '2px solid #555',
+          borderRadius: '50%',
+        };
+        if (isFound) {
+          style.backgroundColor = theme.palette.success.main;
+          style.color = 'white';
+          style.border = `3px solid ${theme.palette.success.dark || '#388E3C'}`;
+          style.boxShadow = `0 0 15px ${theme.palette.success.main}`;
+        } else if (isCutoff) {
+          style.backgroundColor = theme.palette.info.main;
+          style.color = 'white';
+          style.border = `3px solid ${theme.palette.info.dark || '#616161'}`;
+          style.textDecoration = 'line-through';
+        } else if (isCurrent) {
+          style.backgroundColor = theme.palette.warning.main;
+          style.border = `3px solid ${theme.palette.warning.dark || '#FFA000'}`;
+          style.boxShadow = `0 0 15px ${theme.palette.warning.main}`;
+        } else if (isVisited) {
+          style.backgroundColor = theme.palette.primary.main;
+          style.color = 'white';
+          style.border = `3px solid ${theme.palette.primary.dark || '#1976D2'}`;
+        }
+        return { ...node, style };
+      })
     );
-  
-    if (layoutMode === 'manual') { 
-      const edges = [];
-      for (let i = 0; i < count - 1; i++) {
-        const p = parseInt(document.getElementById(`parent${i}`).value);
-        const c = parseInt(document.getElementById(`child${i}`).value);
-        if (!isNaN(p) && !isNaN(c)) edges.push([p, c]);
+    setEdges(eds => eds.map(edge => ({
+      ...edge,
+      animated: edge.source === currentNodeId && !visitedSet.has(edge.target),
+      style: {
+        stroke: (visitedSet.has(edge.source) && visitedSet.has(edge.target)) ? theme.palette.primary.main : '#b1b1b7',
+        strokeWidth: 2.5,
       }
-      createTree(count, values, edges);
-    } else {
-      const nodeList = values.map(v => ({
-        value: v, x: 0, y: 0,
-        children: [], visited: false, found: false, visitOrder: null, depth: 0
-      }));
-      for (let i = 0; i < count; i++) {
-        if (2 * i + 1 < count) nodeList[i].children.push(nodeList[2 * i + 1]);
-        if (2 * i + 2 < count) nodeList[i].children.push(nodeList[2 * i + 2]);
-      }
-      createTreeFromNodes(nodeList);
-    }
+    })))
+  }, [currentNodeId, visitedSet, setNodes, setEdges, targetValue, depthLimit, isFinished, theme]);
 
-    const buildButton = document.getElementById('buildTreeBtn');
-    if (buildButton) {
-      buildButton.style.display = 'none';
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
+  }, [traversalLog]);
+
+  // --- UI Handlers ---
+  const handleNodeCountChange = (event) => {
+    const count = Math.min(parseInt(event.target.value) || 0, 15);
+    setNodeCount(count);
+    setNodeValues(Array.from({ length: count }, (_, i) => String.fromCharCode(65 + i)));
+    setEdgesInput(Array.from({ length: Math.max(0, count - 1) }, () => ({ parent: '', child: '' })));
   };
 
-  const handleGenerate = () => {
-    const count = parseInt(document.getElementById("nodeCount").value);
-    const container = document.getElementById("nodeInputs");
-    container.innerHTML = '';
-
-    container.innerHTML += `<h4>Enter Node Values</h4>`;
-    for (let i = 0; i < count; i++) {
-      container.innerHTML += `Node ${i}: <input type="text" id="nodeVal${i}" /><br>`;
-    }
-
-    if (layoutMode === 'manual') { 
-      container.innerHTML += `<h4>Enter Edges (Parent Index → Child Index)</h4>`;
-      for (let i = 0; i < count - 1; i++) {
-        container.innerHTML += `Edge ${i}: 
-          <input type="number" id="parent${i}" /> →
-          <input type="number" id="child${i}" /><br>`;
-      }
-    }
-    
-    const buildButton = document.getElementById('buildTreeBtn');
-    if (buildButton) {
-      buildButton.style.display = 'inline-block';
-    }
+  const handleCopySteps = () => {
+    navigator.clipboard.writeText(traversalLog)
+      .then(() => showSnackbar("✅ Steps copied to clipboard!", 'success'))
+      .catch(() => showSnackbar("❌ Failed to copy steps.", 'error'));
   };
 
-  const createTreeFromNodes = (nodeList) => {
-    nodes.current = nodeList;
-    root.current = nodeList[0];
-  
-    const levels = {};
-    const assignLevels = (node, depth) => {
-      if (!levels[depth]) levels[depth] = [];
-      levels[depth].push(node);
-      node.depth = depth;
-      node.children.forEach(c => assignLevels(c, depth + 1));
-    };
-  
-    assignLevels(root.current, 0);
-  
-    Object.entries(levels).forEach(([level, levelNodes]) => {
-      const spacing = 600 / (levelNodes.length + 1);
-      levelNodes.forEach((node, i) => {
-        node.x = 100 + spacing * (i + 1);
-        node.y = 100 + parseInt(level) * 100;
-      });
-    });
-  
-    resetTraversal();
-    statusRef.current.innerText = "✅ Auto tree built!";
-  };
-
-  const showToast = (msg) => {
-    const toast = toastRef.current;
-    if (!toast) return;
-    toast.innerText = msg;
-    toast.style.visibility = 'visible';
-    toast.style.opacity = '1';
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.visibility = 'hidden';
-    }, 2000);
-  };
-
+  // --- Render ---
   return (
-    <div style={{ 
-      textAlign: 'center', 
-      padding: 20,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      width: '100%'
-    }}>
-      <h1>DLS Search Simulator</h1>
+    <ThemeProvider theme={theme}>
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', width: '100%', p: { xs: 2, md: 3 } }}>
+        <audio ref={stepAudioRef} src="/step.mp3" preload="auto"></audio>
+        <audio ref={successAudioRef} src="/success.mp3" preload="auto"></audio>
+        <audio ref={failAudioRef} src="/fail.mp3" preload="auto"></audio>
 
-      <div style={{ 
-        marginBottom: 20,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        width: '100%'
-      }}>
-        <div style={{ marginBottom: 10 }}>
-          <label>Layout Mode: </label>
-          <select onChange={(e) => setLayoutMode(e.target.value)} value={layoutMode}>
-            <option value="auto">Auto</option>
-            <option value="manual">Manual</option>
+        <Typography variant="h5" align="center" sx={{ mb: 2 }}>
+          Simulator
+        </Typography>
 
-          </select>
-        </div>
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={isTreeBuilt ? 3 : 4}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Layout</InputLabel>
+                <Select value={layoutMode} label="Layout" onChange={(e) => setLayoutMode(e.target.value)}>
+                  <MenuItem value="auto">Auto (Binary Tree)</MenuItem>
+                  <MenuItem value="manual">Manual Edges</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={isTreeBuilt ? 2 : 4}>
+              <TextField fullWidth size="small" label="Node Count" type="number" value={nodeCount} onChange={handleNodeCountChange} inputProps={{ min: 1, max: 15 }} />
+            </Grid>
+            {isTreeBuilt && (
+              <>
+                <Grid item xs={12} sm={6} md={2}>
+                  <TextField fullWidth size="small" label="Search Target" value={targetValue} onChange={(e) => setTargetValue(e.target.value.toUpperCase())} />
+                </Grid>
+                <Grid item xs={12} sm={6} md={2}>
+                  <TextField fullWidth size="small" label="Depth Limit" type="number" value={depthLimit} onChange={(e) => setDepthLimit(parseInt(e.target.value) || 0)} inputProps={{ min: 0 }} />
+                </Grid>
+              </>
+            )}
+            <Grid item xs={12} sm={isTreeBuilt ? 6 : 12} md={isTreeBuilt ? 3 : 4}>
+              <Button fullWidth variant="contained" startIcon={<BuildIcon />} onClick={handleBuildTree}>Build Tree</Button>
+            </Grid>
+            {layoutMode === 'manual' && (
+              <Grid item xs={12}>
+                <Box sx={{ maxHeight: '150px', overflowY: 'auto', p: 1.5, border: '1px solid #e0e0e0', borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'medium' }}>Edges (Parent Index → Child Index)</Typography>
+                  <Grid container spacing={2}>
+                    {Array.from({ length: nodeCount > 1 ? nodeCount - 1 : 0 }).map((_, i) => (
+                      <Grid item xs={6} sm={4} md={3} key={i}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <TextField label="Parent" type="number" value={edgesInput[i]?.parent || ''} onChange={e => {
+                            const newEdges = [...edgesInput]; if (!newEdges[i]) newEdges[i] = {}; newEdges[i].parent = e.target.value; setEdgesInput(newEdges);
+                          }} size="small" />
+                          <Typography>→</Typography>
+                          <TextField label="Child" type="number" value={edgesInput[i]?.child || ''} onChange={e => {
+                            const newEdges = [...edgesInput]; if (!newEdges[i]) newEdges[i] = {}; newEdges[i].child = e.target.value; setEdgesInput(newEdges);
+                          }} size="small" />
+                        </Stack>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
 
-        <div style={{ marginBottom: 10 }}>
-          <label>Number of Nodes: <input id="nodeCount" type="number" defaultValue="7" /></label>
-          <button onClick={handleGenerate}>Next</button>
-        </div>
-        
-        <div id="nodeInputs" style={{ width: '100%' }} />
-        <button id="buildTreeBtn" onClick={handleCreate} style={{ display: 'none', marginTop: '10px' }}>Build Tree</button>
-      </div>
+        <Grid container spacing={3} alignItems="stretch">
+          <Grid item xs={12} md={7}>
+            <Paper sx={{ height: '100%', p: 1.5, minHeight: 500 }}>
+              <ReactFlowProvider>
+                <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} fitView>
+                  <Controls showInteractive={false} />
+                  <Background />
+                </ReactFlow>
+              </ReactFlowProvider>
+            </Paper>
+          </Grid>
 
-      <div style={{ marginBottom: 10 }}>
-        Search for: <input ref={inputRef} defaultValue="F" />
-        <button onClick={() => {
-          target.current = inputRef.current.value.toUpperCase();
-          resetTraversal();
-        }}>Set Target</button>
-      </div>
-
-      <div style={{ marginBottom: 10 }}>
-        Depth Limit: <input ref={depthLimitInputRef} type="number" defaultValue="2" min="0" />
-        <button onClick={() => {
-          depthLimit.current = parseInt(depthLimitInputRef.current.value);
-          resetTraversal();
-        }}>Set Limit</button>
-      </div>
-
-      <div style={{ marginBottom: 10 }}>
-        <button onClick={resetTraversal}>Reset</button>
-        <button onClick={() => {
-          if (searchComplete.current) return;
-          running.current = true;
-          paused.current = true;
-          dlsStep();
-        }}>Next Step</button>
-        <button onClick={() => { running.current = true; paused.current = false; }}>Run</button>
-        <button onClick={() => { paused.current = true; }}>Pause</button>
-      </div>
-
-      <div ref={statusRef} style={{ fontSize: 18, marginBottom: 20 }}>Status: Ready</div>
-
-      <div style={{ 
-        align:'right',
-        display: 'flex', 
-        justifyContent: 'center', 
-        width: '100%',
-        gap: 40,
-        flexWrap: 'wrap'
-      }}>
-        <div ref={canvasRef}></div>
-        <div style={{ minWidth: 300 }}>
-          <h3>Search Steps</h3>
-          <textarea 
-            ref={textareaRef} 
-            rows={12} 
-            style={{ width: '90%' }} 
-            readOnly 
-          />
-          <br />
-          <button onClick={() => {
-            navigator.clipboard.writeText(textareaRef.current.value);
-            showToast('✅ Steps copied to clipboard!');
-          }}>📋 Copy Steps</button>
-        </div>
-      </div>
-
-      <button onClick={() => {
-        const canvas = canvasRef.current?.querySelector('canvas');
-        if (canvas) {
-          const link = document.createElement('a');
-          link.href = canvas.toDataURL('image/jpeg');
-          link.download = 'dls_tree.jpg';
-          link.click();
-        }
-      }}>
-        🖼️ Download Tree Image (JPG)
-      </button>
-
-      <div ref={toastRef} style={{ 
-        visibility: 'hidden', 
-        opacity: 0, 
-        position: 'fixed', 
-        bottom: 30, 
-        right: 30, 
-        backgroundColor: '#333', 
-        color: '#fff', 
-        padding: '10px 16px', 
-        borderRadius: 8 
-      }}>
-        ✅ Steps copied to clipboard!
-      </div>
-    </div>
+          <Grid item xs={12} md={5}>
+            <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1, flexShrink: 0 }}>
+                <Typography variant="h6">Log & Status</Typography>
+                <Stack direction="row" spacing={0.5}>
+                  <Tooltip title="Reset"><IconButton size="small" onClick={resetSimulation}><ReplayIcon /></IconButton></Tooltip>
+                  <Tooltip title="Previous Step"><IconButton size="small" onClick={handlePrevStep} disabled={history.length === 0}><ArrowBackIcon /></IconButton></Tooltip>
+                  <Tooltip title="Next Step"><IconButton size="small" onClick={handleStep} disabled={isRunning}><ArrowForwardIcon /></IconButton></Tooltip>
+                  <Tooltip title={isRunning ? "Pause" : "Run"}>
+                    <IconButton size="small" onClick={handleRunPause} sx={{ background: isRunning ? theme.palette.warning.light : theme.palette.success.light }}>
+                      {isRunning ? <PauseIcon /> : <PlayArrowIcon />}
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Stack>
+              <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', fontStyle: 'italic', flexShrink: 0 }}>{statusMessage}</Typography>
+              <Box sx={{ flexGrow: 1, minHeight: 200, bgcolor: '#fafafa', borderRadius: 1, p: 1, border: '1px solid #eee' }}>
+                <TextField
+                  inputRef={logContainerRef}
+                  value={traversalLog}
+                  multiline
+                  fullWidth
+                  readOnly
+                  variant="standard"
+                  sx={{
+                    height: '100%',
+                    '& .MuiInputBase-root': { height: '100%', alignItems: 'flex-start' },
+                    '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.8rem', overflowY: 'auto !important', height: '100% !important' }
+                  }}
+                  InputProps={{ disableUnderline: true }}
+                />
+              </Box>
+              <Button variant="contained" color="secondary" size="small" startIcon={<ContentCopyIcon />} onClick={handleCopySteps} sx={{ mt: 1.5, flexShrink: 0 }}>
+                Copy Log
+              </Button>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
+    </ThemeProvider>
   );
 };
 

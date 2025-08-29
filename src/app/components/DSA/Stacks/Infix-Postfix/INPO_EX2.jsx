@@ -1,9 +1,121 @@
 import React, { useState, useRef, useEffect } from 'react';
 import p5 from 'p5';
+
+// --- Sound Imports ---
 import stepSoundFile from '/step.mp3';
 import successSoundFile from '/success.mp3';
 import failSoundFile from '/fail.mp3';
 
+// --- Material UI Imports ---
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  Grid,
+  Alert,
+  Stack,
+  ThemeProvider,
+  createTheme,
+  IconButton,
+  Tooltip,
+  Divider,
+  keyframes
+} from '@mui/material';
+
+// --- Material UI Icons ---
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+
+
+// --- Theme Definition ---
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#2196f3',
+      light: '#64b5f6',
+      contrastText: '#fff'
+    },
+    secondary: {
+      main: '#673ab7',
+    },
+    success: {
+      main: '#4CAF50'
+    },
+    warning: {
+      main: '#FFC107'
+    },
+    error: {
+      main: '#d32f2f'
+    },
+    background: {
+      default: '#eceff1',
+      paper: '#ffffff',
+    },
+    text: {
+      secondary: '#546e7a',
+    }
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h5: { fontWeight: 700 },
+    h6: { fontWeight: 600 },
+  },
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.08)',
+          borderRadius: '16px',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+          textTransform: 'none',
+          fontWeight: '600',
+        }
+      }
+    }
+  },
+});
+
+// --- Constants & Keyframes for Stack Visualization ---
+const ELEMENT_HEIGHT = 40; // px
+const ELEMENT_MARGIN = 8;  // px
+const TOTAL_ELEMENT_SPACE = ELEMENT_HEIGHT + ELEMENT_MARGIN;
+const MAX_STACK_SIZE = 6;
+
+const pushAnimation = (stackSize) => keyframes`
+  from {
+    bottom: 100%;
+    opacity: 0.7;
+  }
+  to {
+    bottom: ${stackSize * TOTAL_ELEMENT_SPACE + ELEMENT_MARGIN}px;
+    opacity: 1;
+  }
+`;
+
+const popAnimation = (stackSize) => keyframes`
+  from {
+    bottom: ${stackSize * TOTAL_ELEMENT_SPACE + ELEMENT_MARGIN}px;
+    opacity: 1;
+  }
+  to {
+    bottom: 100%;
+    opacity: 0;
+  }
+`;
+
+// --- Core Infix to Postfix Logic ---
 const precedence = {
   '+': 1,
   '-': 1,
@@ -15,155 +127,161 @@ const precedence = {
 const isOperator = (char) => ['+', '-', '*', '/', '^'].includes(char);
 const isOperand = (char) => /^[a-zA-Z0-9]$/.test(char);
 
-const INPO_EX2 = () => {
+// --- MODIFICATION: Component now accepts 'showSnackbar' as a prop ---
+const INPO_EX2 = ({ showSnackbar }) => {
   const canvasRef = useRef();
-  const toastRef = useRef();
-  const [expression] = useState('A+(B-C)*D/E^F'); // Editable
+  const [expression] = useState('A+(B-C)*D/E^F');
   const [tokens, setTokens] = useState([]);
   const [index, setIndex] = useState(0);
   const [stack, setStack] = useState([]);
   const [output, setOutput] = useState([]);
   const [stepList, setStepList] = useState([]);
   const [history, setHistory] = useState([]);
+  const logInputRef = useRef(null);
+
+  // --- MODIFICATION: Removed snackbar state ---
+  const [animatingElement, setAnimatingElement] = useState(null);
+  const [nextState, setNextState] = useState(null);
+  const [isFlushing, setIsFlushing] = useState(false);
+  const [isPoppingForParen, setIsPoppingForParen] = useState(false);
 
   const stepSound = useRef(new Audio(stepSoundFile));
   const successSound = useRef(new Audio(successSoundFile));
   const failSound = useRef(new Audio(failSoundFile));
 
   useEffect(() => {
+    if (logInputRef.current) {
+      logInputRef.current.scrollTop = logInputRef.current.scrollHeight;
+    }
+  }, [stepList]);
+
+  useEffect(() => {
     setTokens(expression.split(''));
     const sketch = new p5((p) => {
+      let parentDiv;
       p.setup = () => {
-        const canvas = p.createCanvas(900, 360);
-        canvas.parent(canvasRef.current);
+        parentDiv = canvasRef.current;
+        const canvas = p.createCanvas(parentDiv.offsetWidth, parentDiv.offsetHeight);
+        canvas.parent(parentDiv);
+      };
+
+      p.windowResized = () => {
+        if (parentDiv) {
+          p.resizeCanvas(parentDiv.offsetWidth, parentDiv.offsetHeight);
+        }
       };
 
       p.draw = () => {
         p.background(255);
-        drawStackBucket(p);
-        drawOutput(p);
-      };
-
-      const drawStackBucket = (p) => {
-        const boxW = 60;
-        const boxH = 40;
-        const bucketX = 110;
-        const bucketYBottom = 320;
-        const bucketHeight = 240;
-        const bucketWidth = boxW + 20;
-
-        // 🪣 Bucket structure
-        p.stroke(150);
-        p.strokeWeight(3);
-        p.noFill();
-        p.beginShape();
-        p.vertex(bucketX, bucketYBottom - bucketHeight); // top-left
-        p.vertex(bucketX, bucketYBottom); // bottom-left
-        p.vertex(bucketX + bucketWidth, bucketYBottom); // bottom-right
-        p.vertex(bucketX + bucketWidth, bucketYBottom - bucketHeight); // top-right
-        p.endShape();
-
-        // 🧱 Stack content
-        p.fill(0);
-        p.textSize(20);
-        p.noStroke();
-        p.textAlign(p.CENTER, p.CENTER);
-        p.text('Operator Stack',150, 30);
-
-        for (let i = 0; i < stack.length; i++) {
-          const y = bucketYBottom - (i + 1) * (boxH + 10);
-          p.fill('#64b5f6');
-          p.stroke(0);
-          p.rect(bucketX + 10, y, boxW, boxH, 6);
-          p.noStroke();
-          p.fill(0);
-          p.text(stack[i], bucketX + 10 + boxW / 2, y + boxH / 2);
-        }
-
-        if (stack.length === 0) {
-          p.fill('#aaa');
-          p.noStroke();
-          p.text('Empty', bucketX + bucketWidth / 2, bucketYBottom - bucketHeight + 40);
-        }
-      };
-
-      const drawOutput = (p) => {
-        p.fill(0);
-        p.textSize(20);
-        p.textAlign(p.LEFT, p.CENTER);
-        p.text('Postfix Output:', 460, 30);
-
+        const boxSize = 40;
         const spacing = 45;
-        const y = 80;
-        const startX = 370;
+        const requiredWidth = (output.length * spacing) + 20;
+        const newWidth = Math.max(parentDiv ? parentDiv.offsetWidth : 0, requiredWidth);
 
-        for (let i = 0; i < output.length; i++) {
+        if (p.width !== newWidth) {
+          p.resizeCanvas(newWidth, p.height);
+        }
+
+        drawOutput(p, boxSize, spacing);
+      };
+      const drawOutput = (p, boxSize, spacing) => {
+        p.fill(0);
+        p.textSize(18);
+        p.textAlign(p.LEFT, p.CENTER);
+        p.noStroke();
+        p.text('Postfix Output:', 10, 20);
+
+        const startY = 80;
+        const totalWidth = output.length * spacing - (spacing - boxSize);
+        const startX = p.width > totalWidth ? (p.width - totalWidth) / 2 : 10;
+
+        output.forEach((item, i) => {
+          const xPos = startX + i * spacing;
+          const yPos = startY;
+
           p.fill('#a5d6a7');
           p.stroke(0);
-          p.rect(startX + i * spacing, y, 40, 40, 6);
+          p.rect(xPos, yPos, boxSize, boxSize, 6);
           p.fill(0);
           p.noStroke();
-          p.text(output[i], startX + i * spacing + 15, y + 20);
-        }
+          p.textAlign(p.CENTER, p.CENTER);
+          p.text(item, xPos + boxSize / 2, yPos + boxSize / 2);
+        });
 
         if (output.length === 0) {
           p.fill('#aaa');
-          p.text('Empty', startX, y + 60);
+          p.textAlign(p.CENTER, p.CENTER);
+          p.text('Empty', p.width / 2, startY + boxSize / 2);
         }
       };
     });
-
     return () => sketch.remove();
-  }, [stack, output]);
+  }, [expression, output]);
 
-  const showToast = (msg) => {
-    const toast = toastRef.current;
-    if (!toast) return;
-    toast.innerText = msg;
-    toast.style.visibility = 'visible';
-    toast.style.opacity = 1;
-    setTimeout(() => {
-      toast.style.opacity = 0;
-      toast.style.visibility = 'hidden';
-    }, 2000);
+  useEffect(() => {
+    if ((isFlushing || isPoppingForParen) && stack.length > 0 && !animatingElement) {
+      const topOfStack = stack[stack.length - 1];
+
+      if (isPoppingForParen && topOfStack === '(') {
+        setStack(prev => prev.slice(0, -1));
+        setStepList(prev => [...prev, `🧹 Discarded matching '('`]);
+        setIsPoppingForParen(false);
+        setIndex(prev => prev + 1);
+        return;
+      }
+
+      const poppedValue = topOfStack;
+      const newStack = stack.slice(0, -1);
+      const reason = isFlushing ? 'final flush' : "found ')'";
+
+      setStepList(prev => [...prev, `📤 Popped '${poppedValue}' from stack to output (${reason}).`]);
+      setOutput(prev => [...prev, poppedValue]);
+      setStack(newStack);
+      setAnimatingElement({ value: poppedValue, type: 'pop' });
+
+    } else if (isFlushing && stack.length === 0 && !animatingElement) {
+      setIsFlushing(false);
+      successSound.current.play();
+      showSnackbar('Conversion Complete!', 'success');
+    }
+  }, [isFlushing, isPoppingForParen, stack, animatingElement, showSnackbar]);
+
+  // --- MODIFICATION: Removed local showSnackbar and handleCloseSnackbar functions ---
+
+  const handleAnimationEnd = () => {
+    if (nextState) {
+      setStack(nextState.stack);
+      setOutput(nextState.output);
+      setStepList(nextState.stepList);
+      setIndex(nextState.index);
+      setHistory(nextState.history);
+      setNextState(null);
+    }
+    setAnimatingElement(null);
   };
 
   const performStep = () => {
+    if (animatingElement || isFlushing || isPoppingForParen) return;
+
     if (index >= tokens.length) {
       if (stack.length > 0) {
-        const newStack = [...stack];
-        const newOutput = [...output];
-        const newStepList = [...stepList];
-        const newHistory = [...history];
-  
-        while (newStack.length) {
-          const op = newStack.pop();
-          newOutput.push(op);
-          newStepList.push(`📤 Popped '${op}' from stack to output (final flush).`);
-        }
-  
-        setHistory([...newHistory, { stack, output, index }]);
-        setStack([]);
-        setOutput(newOutput);
-        setStepList(newStepList);
-        successSound.current.play();
-        showToast('✅ Conversion Complete');
+        setIsFlushing(true);
       } else {
-        successSound.current.play();
-        showToast('✅ Conversion Complete');
+        showSnackbar('Conversion is already complete!', 'info');
       }
       return;
     }
-  
+
     const token = tokens[index];
-    const newStack = [...stack];
-    const newOutput = [...output];
-    const newStepList = [...stepList];
-  
-    // 🎵 Play step sound here, only for real steps
+    let newStack = [...stack];
+    let newOutput = [...output];
+    let newStepList = [...stepList];
+    let poppedForPrecedence = false;
+    let poppedValue = null;
+
     stepSound.current.currentTime = 0;
     stepSound.current.play();
-  
+
     if (isOperand(token)) {
       newOutput.push(token);
       newStepList.push(`✅ Added operand '${token}' to output`);
@@ -171,45 +289,56 @@ const INPO_EX2 = () => {
       newStack.push(token);
       newStepList.push(`🟦 Pushed '(' onto stack`);
     } else if (token === ')') {
-      while (newStack.length && newStack[newStack.length - 1] !== '(') {
-        const op = newStack.pop();
-        newOutput.push(op);
-        newStepList.push(`📤 Popped '${op}' to output until '('`);
-      }
-      newStack.pop(); // remove '('
-      newStepList.push(`🧹 Discarded matching '('`);
+      setIsPoppingForParen(true);
+      setHistory(prev => [...prev, { stack, output, index }]);
+      return; // Let the useEffect handle the pops
     } else if (isOperator(token)) {
       while (
         newStack.length &&
+        newStack[newStack.length - 1] !== '(' &&
         precedence[newStack[newStack.length - 1]] >= precedence[token]
       ) {
-        const op = newStack.pop();
-        newOutput.push(op);
-        newStepList.push(`⬇️ Popped '${op}' to output (precedence)`);
+        poppedValue = newStack.pop();
+        newOutput.push(poppedValue);
+        newStepList.push(`⬇️ Popped '${poppedValue}' to output (precedence)`);
+        poppedForPrecedence = true;
       }
       newStack.push(token);
       newStepList.push(`⬆️ Pushed operator '${token}' to stack`);
     }
-  
-    setHistory([...history, { stack, output, index }]);
-    setStack(newStack);
-    setOutput(newOutput);
-    setStepList(newStepList);
-    setIndex(index + 1);
-  };  
+
+    const finalHistory = [...history, { stack, output, index }];
+    const didPush = newStack.length > stack.length;
+
+    if (poppedForPrecedence) {
+      const intermediateStack = stack.slice(0, -1);
+      setNextState({ stack: newStack, output: newOutput, index: index + 1, stepList: newStepList, history: finalHistory });
+      setStack(intermediateStack);
+      setAnimatingElement({ value: poppedValue, type: 'pop' });
+    } else if (didPush) {
+      setNextState({ stack: newStack, output: newOutput, index: index + 1, stepList: newStepList, history: finalHistory });
+      setAnimatingElement({ value: token, type: 'push' });
+    } else {
+      setOutput(newOutput);
+      setStepList(newStepList);
+      setIndex(index + 1);
+      setHistory(finalHistory);
+    }
+  };
 
   const undoStep = () => {
-    if (history.length === 0) {
-      failSound.current.play();
-      showToast('⛔ No previous steps');
+    if (animatingElement || history.length === 0) {
+      if (!animatingElement) {
+        failSound.current.play();
+        showSnackbar('No previous steps to undo', 'warning');
+      }
       return;
     }
-
     const last = history[history.length - 1];
     setStack(last.stack);
     setOutput(last.output);
     setIndex(last.index);
-    setStepList((prev) => prev.slice(0, -1));
+    setStepList((prev) => prev.slice(0, prev.lastIndexOf(`⬆️`) || prev.lastIndexOf(`⬇️`) || prev.length));
     setHistory((prev) => prev.slice(0, -1));
   };
 
@@ -219,84 +348,141 @@ const INPO_EX2 = () => {
     setStepList([]);
     setIndex(0);
     setHistory([]);
-    showToast('🔁 Reset Done');
+    setAnimatingElement(null);
+    setNextState(null);
+    setIsFlushing(false);
+    setIsPoppingForParen(false);
+    showSnackbar('Visualizer has been reset', 'info');
   };
 
+  const handleCopySteps = () => {
+    if (stepList.length === 0) { showSnackbar("No steps to copy.", "warning"); return; }
+    navigator.clipboard.writeText(stepList.join('\n'))
+      .then(() => showSnackbar("✅ Steps copied to clipboard!", 'success'))
+      .catch(() => showSnackbar("❌ Failed to copy steps.", 'error'));
+  };
+
+  const stackContainerHeight = (MAX_STACK_SIZE * TOTAL_ELEMENT_SPACE) + ELEMENT_MARGIN;
+  const currentAnimation = animatingElement?.type === 'push'
+    ? pushAnimation(stack.length)
+    : popAnimation(stack.length);
+
   return (
-    <div style={{ fontFamily: 'Segoe UI', textAlign: 'center', padding: 20 }}>
-      <h1>Infix to Postfix Visualizer</h1>
-      <p style={{ fontSize: 18 }}>
-        <b>Expression:</b> {expression}
-      </p>
+    <ThemeProvider theme={theme}>
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', width: '100%', p: { xs: 2, md: 3 } }}>
+        <Typography variant="h5" align="center" sx={{ mb: 3 }}>
+          Example 2
+        </Typography>
 
-      <div style={{ margin: '20px' }}>
-      <button onClick={performStep} style={btnStyle}>Next Step</button>
-        <button onClick={undoStep} style={btnStyle}>Previous Step</button>
-        <button onClick={handleReset} style={btnStyle}>Reset</button>
-      </div>
+        <Grid container spacing={3} alignItems="stretch">
+          <Grid item xs={12} md={8}>
+            <Paper sx={{
+              height: '100%', p: 3, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box'
+            }}>
+              <Typography variant="h6" sx={{ mb: 2, alignSelf: 'center' }}>
+                <b>Expression:</b> {expression}
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', mt: 2, flexGrow: 1, gap: 4 }}>
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Typography variant="h6" sx={{ mb: 1, fontSize: '1.1rem' }}>Operator Stack</Typography>
+                  <Box sx={{
+                    width: '120px', height: `${stackContainerHeight}px`, position: 'relative',
+                    bgcolor: '#bdbdbd', borderRadius: '12px',
+                    boxShadow: 'inset 5px 5px 10px #9e9e9e, inset -5px -5px 10px #dcdcdc',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Box sx={{ position: 'absolute', bottom: 0, left: '8px', right: '8px', height: '100%', overflow: 'hidden' }}>
+                      {stack.map((value, index) => (
+                        <Box key={index} sx={{
+                          position: 'absolute', bottom: `${(index * TOTAL_ELEMENT_SPACE) + ELEMENT_MARGIN}px`,
+                          width: '100%', bgcolor: 'primary.main', color: 'primary.contrastText',
+                          height: `${ELEMENT_HEIGHT}px`, borderRadius: '6px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 'bold', fontSize: '1.2rem', boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
+                        }}>
+                          {value}
+                        </Box>
+                      ))}
+                      {animatingElement && (
+                        <Box onAnimationEnd={handleAnimationEnd} sx={{
+                          position: 'absolute', width: '100%', display: 'flex',
+                          flexDirection: 'column', alignItems: 'center',
+                          animation: `${currentAnimation} 0.8s forwards ease-in-out`,
+                        }}>
+                          {animatingElement.type === 'pop' && <ArrowUpwardIcon sx={{ color: 'error.main', mb: 0.5 }} />}
+                          <Box sx={{
+                            bgcolor: 'secondary.light', color: 'primary.contrastText',
+                            width: '100%', height: `${ELEMENT_HEIGHT}px`, borderRadius: '6px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: 'bold', fontSize: '1.2rem', boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                          }}>
+                            {animatingElement.value}
+                          </Box>
+                          {animatingElement.type === 'push' && <ArrowDownwardIcon sx={{ color: 'success.main', mt: 0.5 }} />}
+                        </Box>
+                      )}
+                    </Box>
+                    {stack.length === 0 && !animatingElement && (
+                      <Typography variant="subtitle1" sx={{ zIndex: 1, userSelect: 'none', color: '#616161', fontWeight: 500 }}>
+                        Stack is Empty
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '40px' }}>
-        <div ref={canvasRef}></div>
+                <Box
+                  ref={canvasRef}
+                  sx={{
+                    flex: 1,
+                    height: '100%',
+                    minHeight: '250px',
+                  }}
+                />
+              </Box>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: { xs: 2, md: 2.5 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Stack spacing={2.5} sx={{ flexGrow: 1 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Controls</Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}><Button fullWidth variant="contained" startIcon={<ArrowForwardIcon />} onClick={performStep} disabled={!!animatingElement}>Next Step</Button></Grid>
+                    <Grid item xs={6}><Button fullWidth variant="outlined" startIcon={<ArrowBackIcon />} onClick={undoStep} disabled={!!animatingElement}>Prev Step</Button></Grid>
+                  </Grid>
+                </Box>
+                <Divider />
+                <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6">Execution Log</Typography>
+                    <Tooltip title="Reset Visualizer & Log"><IconButton onClick={handleReset} color="error" disabled={!!animatingElement || isFlushing}><RestartAltIcon /></IconButton></Tooltip>
+                  </Box>
+                  <Box sx={{ flexGrow: 1, minHeight: 200, bgcolor: '#fafafa', borderRadius: 1, p: 1.5, border: '1px solid #eee', mt: 1 }}>
+                    <TextField
+                      value={stepList.length > 0 ? stepList.join('\n') : "Perform an operation to see the log..."}
+                      multiline fullWidth readOnly variant="standard" inputRef={logInputRef}
+                      sx={{
+                        height: '100%',
+                        '& .MuiInputBase-root': { height: '100%', alignItems: 'flex-start' },
+                        '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.85rem', overflowY: 'auto !important', height: '100% !important', color: stepList.length === 0 ? '#999' : 'inherit' }
+                      }}
+                      InputProps={{ disableUnderline: true }}
+                    />
+                  </Box>
+                </Box>
+                <Button variant="contained" color="secondary" size="small" startIcon={<ContentCopyIcon />} onClick={handleCopySteps}>
+                  Copy Log
+                </Button>
+              </Stack>
+            </Paper>
+          </Grid>
+        </Grid>
 
-        <div style={{ width: 320 }}>
-          <h3>📋 Conversion Steps</h3>
-          <textarea
-            readOnly
-            rows="15"
-            value={stepList.join('\n')}
-            style={{
-              width: '100%',
-              padding: 10,
-              fontSize: 15,
-              borderRadius: 6,
-              border: '1px solid #ccc',
-              backgroundColor: '#f9f9f9',
-            }}
-          />
-          <button
-            onClick={async () => {
-              await navigator.clipboard.writeText(stepList.join('\n'));
-              showToast('✅ Steps copied to clipboard!');
-            }}
-            style={{marginTop: 8 }}
-          >
-            📋 Copy to Clipboard
-          </button>
-        </div>
-      </div>
-
-      <div ref={toastRef} style={toastStyle}></div>
-    </div>
+        {/* --- MODIFICATION: Removed the <Snackbar> component from here --- */}
+      </Box>
+    </ThemeProvider>
   );
-};
-
-const btnStyle = {
-  padding: '10px 16px',
-  fontSize: '16px',
-  marginRight: '10px',
-  borderRadius: '6px',
-  border: 'none',
-  backgroundColor: '#007BFF',
-  color: 'white',
-  cursor: 'pointer',
-};
-
-const toastStyle = {
-  visibility: 'hidden',
-  minWidth: '200px',
-  backgroundColor: '#323232',
-  color: '#fff',
-  textAlign: 'center',
-  borderRadius: '8px',
-  padding: '12px 16px',
-  position: 'fixed',
-  bottom: '30px',
-  right: '30px',
-  zIndex: 9999,
-  fontSize: '14px',
-  boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-  opacity: 0,
-  transition: 'visibility 0s, opacity 0.3s ease-in-out',
 };
 
 export default INPO_EX2;

@@ -1,135 +1,281 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  AppBar,
+  Toolbar,
+  Button,
+  Typography,
+  Box,
+  Paper,
+  Container,
+  TextField,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormControl,
+  LinearProgress,
+  Alert,
+  createTheme,
+  ThemeProvider,
+  CssBaseline,
+  Snackbar, // Added for centralized snackbar
+} from '@mui/material';
+import {
+  Timeline,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineConnector,
+  TimelineContent,
+  TimelineDot,
+} from '@mui/lab';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
+import CodeIcon from '@mui/icons-material/Code';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined';
+import QuizIcon from '@mui/icons-material/Quiz';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SpeedIcon from '@mui/icons-material/Speed';
+import GroupWorkIcon from '@mui/icons-material/GroupWork';
+
+// Assuming these components exist and are adapted for Queues
 import QOP from './QOP';
 import QOP_Monoco from './QOP_Monoco';
+import { useScrollToTop } from 'app/hooks/useScrollToTop';
+
+// Navbar Component
+const Navbar = ({ setActivePage, activePage }) => {
+  const NavButton = ({ icon, label, page, isActive = false }) => (
+    <Button
+      variant="text"
+      onClick={() => setActivePage(page)}
+      startIcon={icon}
+      sx={{
+        color: isActive ? '#ffffff' : '#e2e8f0',
+        borderRadius: 2,
+        px: { xs: 0.8, sm: 1.5, md: 2 },
+        py: { xs: 0.5, sm: 1 },
+        textTransform: 'none',
+        fontWeight: 600,
+        fontSize: { xs: '0.75rem', sm: '0.9rem', md: '1rem' },
+        minWidth: 'auto',
+        transition: 'background-color 0.3s ease, color 0.3s ease, transform 0.3s ease',
+        background: isActive ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+        '&:hover': {
+          bgcolor: isActive ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.1)',
+          color: '#ffffff',
+          transform: 'translateY(-2px)',
+        },
+      }}
+    >
+      {label}
+    </Button>
+  );
+
+  return (
+    <AppBar position="sticky" sx={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%)', py: 1 }}>
+      <Toolbar sx={{ justifyContent: 'center', gap: { xs: 0.5, sm: 1.5, md: 2.5 }, flexWrap: 'wrap' }}>
+        <NavButton icon={<CheckCircleOutlineIcon />} label="Aim" page="aim" isActive={activePage === 'aim'} />
+        <NavButton icon={<LightbulbOutlinedIcon />} label="Theory" page="theory" isActive={activePage === 'theory'} />
+        <NavButton icon={<AssignmentOutlinedIcon />} label="Procedure" page="procedure" isActive={activePage === 'procedure'} />
+        <NavButton icon={<PlayArrowIcon />} label="Simulation" page="simulation" isActive={activePage === 'simulation'} />
+        <NavButton icon={<CodeIcon />} label="Code" page="Code" isActive={activePage === 'Code'} />
+        <NavButton icon={<QuizIcon />} label="Quiz" page="quiz" isActive={activePage === 'quiz'} />
+        <NavButton icon={<FeedbackOutlinedIcon />} label="Feedback" page="feedback" isActive={activePage === 'feedback'} />
+      </Toolbar>
+    </AppBar>
+  );
+};
+
+const theme = createTheme({
+  typography: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif' },
+  components: { MuiCssBaseline: { styleOverrides: { body: { backgroundColor: '#ffffff' } } } },
+});
 
 const QOP_template = () => {
-    const [activePage, setActivePage] = useState('aim');
-    const [showExamples, setShowExamples] = useState(false);
-  
-    const renderContent = () => {
-      switch (activePage) {
-        case 'aim':
+  const [activePage, setActivePage] = useState('aim');
+  useScrollToTop(activePage);
+
+  // Snackbar state and handlers are now managed here
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+
+  const showSnackbar = useCallback((message, severity = 'info') => {
+    setSnackbar({ open: true, message, severity });
+  }, []);
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  const [quizState, setQuizState] = useState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null });
+  const questions = [
+    {
+      question: 'What does FIFO stand for in the context of a queue?',
+      options: ['First-In, First-Out', 'Fast-In, Fast-Out', 'Last-In, First-Out', 'First-In, Final-Out'],
+      correctAnswer: 'First-In, First-Out',
+      explanation: 'FIFO stands for First-In, First-Out, the fundamental principle of a queue, like a line of people.',
+    },
+    {
+      question: 'Which operation removes an element from a queue?',
+      options: ['Push', 'Enqueue', 'Pop', 'Dequeue'],
+      correctAnswer: 'Dequeue',
+      explanation: 'The "Dequeue" operation removes an element from the front (or head) of the queue.',
+    },
+  ];
+
+  // Quiz handlers
+  const handleQuizAnswer = (value) => setQuizState((prev) => ({ ...prev, selectedAnswer: value }));
+  const handleQuizSubmit = () => {
+    const currentQ = questions[quizState.currentQuestion];
+    const isCorrect = quizState.selectedAnswer === currentQ.correctAnswer;
+    setQuizState((prev) => ({ ...prev, submitted: true, feedback: { isCorrect, message: currentQ.explanation, severity: isCorrect ? 'success' : 'error' }, score: isCorrect ? prev.score + 1 : prev.score }));
+  };
+  const handleQuizNext = () => setQuizState((prev) => ({ ...prev, currentQuestion: prev.currentQuestion + 1, selectedAnswer: '', submitted: false, feedback: null }));
+  const handleQuizReset = () => setQuizState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null });
+
+  const renderContent = () => {
+    switch (activePage) {
+      case 'aim':
+        return (
+          <>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', mb: 3, border: '1px solid #bfdbfe' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <CheckCircleOutlineIcon sx={{ color: '#3b82f6', mr: 1.5 }} />
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e3a8a' }}>Aim of the Visualizer</Typography>
+              </Box>
+              <Typography variant="body1" sx={{ color: '#1f2937' }}>
+                The aim of this visualization is to understand the working of a <strong>Queue data structure</strong> and its First-In, First-Out (FIFO) principle through interactive animations of Enqueue and Dequeue operations.
+              </Typography>
+            </Paper>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f0fdf4', mb: 3, border: '1px solid #bbf7d0' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <TrendingUpIcon sx={{ color: '#22c55e', mr: 1.5 }} />
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e3a8a' }}>Key Features & Learning Benefits</Typography>
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}><Typography fontWeight="bold">Interactive Operations</Typography><Typography variant="body2">Directly Enqueue and Dequeue elements.</Typography></Paper>
+                <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}><Typography fontWeight="bold">Visual Feedback</Typography><Typography variant="body2">Watch the queue change with clear animations.</Typography></Paper>
+                <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}><Typography fontWeight="bold">FIFO Principle</Typography><Typography variant="body2">See why the first element in is the first out.</Typography></Paper>
+                <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}><Typography fontWeight="bold">Real-time State</Typography><Typography variant="body2">Track the front, rear, and size of the queue.</Typography></Paper>
+              </Box>
+            </Paper>
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e3a8a', mb: 2, textAlign: 'center' }}>Your Learning Journey</Typography>
+              <Timeline position="alternate">
+                <TimelineItem><TimelineSeparator><TimelineDot color="primary"><LightbulbOutlinedIcon /></TimelineDot><TimelineConnector /></TimelineSeparator><TimelineContent><Paper variant="outlined" sx={{ p: 2 }}><Typography fontWeight="bold">Understand Queue Theory</Typography><Typography>Learn the core FIFO principle.</Typography></Paper></TimelineContent></TimelineItem>
+                <TimelineItem><TimelineSeparator><TimelineDot color="secondary"><PlayArrowIcon /></TimelineDot><TimelineConnector /></TimelineSeparator><TimelineContent><Paper variant="outlined" sx={{ p: 2 }}><Typography fontWeight="bold">Visualize Operations</Typography><Typography>See how Enqueue & Dequeue work.</Typography></Paper></TimelineContent></TimelineItem>
+                <TimelineItem><TimelineSeparator><TimelineDot color="success"><AssignmentOutlinedIcon /></TimelineDot><TimelineConnector /></TimelineSeparator><TimelineContent><Paper variant="outlined" sx={{ p: 2 }}><Typography fontWeight="bold">Practice Hands-On</Typography><Typography>Use the simulator to build queues.</Typography></Paper></TimelineContent></TimelineItem>
+                <TimelineItem><TimelineSeparator><TimelineDot color="info"><CodeIcon /></TimelineDot><TimelineConnector /></TimelineSeparator><TimelineContent><Paper variant="outlined" sx={{ p: 2 }}><Typography fontWeight="bold">Connect to Code</Typography><Typography>Relate the visuals to implementation.</Typography></Paper></TimelineContent></TimelineItem>
+                <TimelineItem><TimelineSeparator><TimelineDot color="warning"><QuizIcon /></TimelineDot></TimelineSeparator><TimelineContent><Paper variant="outlined" sx={{ p: 2 }}><Typography fontWeight="bold">Test Your Knowledge</Typography><Typography>Take the quiz to reinforce learning.</Typography></Paper></TimelineContent></TimelineItem>
+              </Timeline>
+            </Box>
+          </>
+        );
+      case 'theory':
+        return (
+          <>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#eff6ff', mb: 3, border: '1px solid #bfdbfe' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}><LightbulbOutlinedIcon sx={{ color: '#3b82f6', mr: 1 }} /><Typography variant="h6" sx={{ fontWeight: 600 }}>What is a Queue?</Typography></Box>
+              <Typography variant="body1">A <strong>Queue</strong> is a linear data structure that follows the <strong>First-In, First-Out (FIFO)</strong> principle. This means the first element added to the queue will be the first one to be removed. A real-world example is a line of people waiting for a service.</Typography>
+            </Paper>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#eff6ff', mb: 3, border: '1px solid #bfdbfe' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}><GroupWorkIcon sx={{ color: '#3b82f6', mr: 1 }} /><Typography variant="h6" sx={{ fontWeight: 600 }}>Core Operations</Typography></Box>
+              <Typography variant="body1"><strong>Enqueue:</strong> Adds an element to the end (rear) of the queue.</Typography>
+              <Typography variant="body1"><strong>Dequeue:</strong> Removes an element from the front (head) of the queue.</Typography>
+              <Typography variant="body1"><strong>Front/Peek:</strong> Returns the first element without removing it.</Typography>
+            </Paper>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#fef3c7', mb: 3, border: '1px solid #fbbf24' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}><SpeedIcon sx={{ color: '#d97706', mr: 1 }} /><Typography variant="h6" sx={{ fontWeight: 600 }}>Time & Space Complexity</Typography></Box>
+              <Typography variant="body1"><strong>Time Complexity:</strong> O(1) for Enqueue and Dequeue operations.</Typography>
+              <Typography variant="body1"><strong>Space Complexity:</strong> O(n) where n is the number of items in the queue.</Typography>
+            </Paper>
+          </>
+        );
+      case 'procedure':
+        return (
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#eff6ff', border: '1px solid #bfdbfe' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}><AssignmentOutlinedIcon sx={{ color: '#3b82f6', mr: 1 }} /><Typography variant="h6" sx={{ fontWeight: 600 }}>How to Use the Visualizer</Typography></Box>
+            <Box component="ol" sx={{ pl: 3 }}>
+              <li>Enter a value in the input field.</li>
+              <li>Click <strong>Enqueue</strong> to add the element to the rear of the queue.</li>
+              <li>Click <strong>Dequeue</strong> to remove the element from the front.</li>
+              <li>Observe the animation and the log to understand the FIFO principle.</li>
+            </Box>
+          </Paper>
+        );
+      case 'simulation': return <QOP showSnackbar={showSnackbar} />;
+      case 'Code': return <QOP_Monoco showSnackbar={showSnackbar} />;
+      case 'quiz':
+        return (
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f8fafc' }}>
+            {quizState.currentQuestion < questions.length ? (
+              <>
+                <LinearProgress variant="determinate" value={((quizState.currentQuestion + 1) / questions.length) * 100} sx={{ mb: 3 }} />
+                <Typography variant="h6" sx={{ mb: 3 }}>Question {quizState.currentQuestion + 1}</Typography>
+                <Typography variant="body1" sx={{ mb: 3 }}>{questions[quizState.currentQuestion].question}</Typography>
+                <FormControl component="fieldset" sx={{ width: '100%', mb: 3 }}>
+                  <RadioGroup value={quizState.selectedAnswer} onChange={(e) => handleQuizAnswer(e.target.value)}>
+                    {questions[quizState.currentQuestion].options.map((option, index) => (
+                      <FormControlLabel key={index} value={option} control={<Radio />} label={option} disabled={quizState.submitted} />
+                    ))}
+                  </RadioGroup>
+                </FormControl>
+                {quizState.feedback && <Alert severity={quizState.feedback.severity} sx={{ mb: 3 }}>{quizState.feedback.message}</Alert>}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  {!quizState.submitted ? <Button variant="contained" onClick={handleQuizSubmit} disabled={!quizState.selectedAnswer}>Submit</Button> : <Button variant="contained" onClick={handleQuizNext}>Next</Button>}
+                </Box>
+              </>
+            ) : (
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h4" sx={{ mb: 2 }}>Quiz Complete!</Typography>
+                <Typography variant="h6" sx={{ mb: 3 }}>Your Score: {quizState.score} / {questions.length}</Typography>
+                <Button variant="contained" onClick={handleQuizReset}>Retake Quiz</Button>
+              </Box>
+            )}
+          </Paper>
+        );
+      case 'feedback':
+        return (
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f8fafc' }}>
+            <Typography variant="h6" sx={{ mb: 3 }}>Feedback</Typography>
+            <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField label="Your Name" variant="outlined" fullWidth />
+              <TextField label="Your Feedback" variant="outlined" multiline rows={4} fullWidth />
+              <Button variant="contained" sx={{ alignSelf: 'flex-start' }}>Submit</Button>
+            </Box>
+          </Paper>
+        );
+      default: return null;
+    }
+  };
+
   return (
-    <div style={{ maxWidth: '800px', margin: 'auto', textAlign: 'left' }}>
-      <h2>Aim</h2>
-      <p>
-        The aim of this visualization is to help learners understand the working of the <strong>Binary Search algorithm</strong> on a sorted array using intuitive animations and interactive control.
-      </p>
-
-      <p>
-        This simulator enables users to:
-      </p>
-      <ul>
-        <li>Visualize how the search range narrows using low, mid, and high pointers.</li>
-        <li>Identify how decisions are made to go left or right in the array.</li>
-        <li>Interactively control steps and trace the search history.</li>
-        <li>Receive audio feedback and real-time updates on search status.</li>
-        <li>Learn how binary search achieves O(log n) efficiency.</li>
-      </ul>
-
-      <p>
-        This is ideal for learners exploring search techniques and optimizing solutions involving sorted data.
-      </p>
-    </div>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box>
+        <Navbar setActivePage={setActivePage} activePage={activePage} />
+        <Container key={activePage} maxWidth="lg" sx={{ py: 4, willChange: 'transform', scrollBehavior: 'auto', position: 'relative', top: 0 }}>
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 700, color: '#1e3a8a', mb: 4, textAlign: 'center' }}>
+            QUEUE OPERATIONS
+          </Typography>
+          {renderContent()}
+        </Container>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }} variant="filled">
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </ThemeProvider>
   );
-        case 'theory':
-          return (<div style={{ maxWidth: '800px', margin: 'auto', textAlign: 'left' }}>
-            <p><b>Definition:</b> Binary Search is an efficient searching algorithm used to find a target value in a sorted array by repeatedly dividing the search interval in half.</p>
-          
-            <p><b>Working Principle:</b> It compares the target value with the middle element. If it matches, search ends. If the target is smaller, the search continues in the left half; if larger, in the right half.</p>
-          
-            <p><b>Precondition:</b> The array must be sorted in ascending or descending order.</p>
-          
-            <p><b>Advantages:</b></p>
-            <ul>
-              <li>Much faster than linear search for large datasets.</li>
-              <li>Time complexity is logarithmic, making it highly efficient.</li>
-            </ul>
-          
-            <p><b>Disadvantages:</b></p>
-            <ul>
-              <li>Cannot be applied to unsorted data.</li>
-              <li>Requires random access — not suitable for linked lists.</li>
-            </ul>
-          
-            <p><b>Time Complexity:</b> <code>O(log n)</code></p>
-            <p><b>Space Complexity:</b> <code>O(1)</code> for iterative, <code>O(log n)</code> for recursive implementation.</p>
-          </div>
-          );
-        case 'procedure':
-          return (<div style={{ maxWidth: '800px', margin: 'auto', textAlign: 'left' }}>
-            <b>How to Use the Binary Search Visualizer:</b>
-            <ol>
-              <li>Set the target value using the input field.</li>
-              <li>Click <b>Set Target</b> to apply the value.</li>
-              <li>Click <b>Reset</b> to reload the array.</li>
-              <li>Click <b>Next Step</b> to perform one iteration of binary search (compare mid element).</li>
-              <li>Click <b>Run</b> to automatically search through the array step-by-step.</li>
-              <li>Use <b>Pause</b> to halt the animation at any time.</li>
-              <li>The positions of <b>Low</b>, <b>Mid</b>, and <b>High</b> pointers will be shown for each step.</li>
-              <li>Once the element is found or not found, the steps will be shown on the right panel.</li>
-              <li>You can copy the search steps to clipboard using the <b>📋 Copy Steps</b> button.</li>
-            </ol>
-          </div>
-          );
-        case 'simulation':
-          return <QOP />;
-        case 'Code':
-          return <QOP_Monoco />;
-        case 'feedback':
-          return <Section title="Feedback" text="Please submit your feedback about this simulation." />;
-        default:
-          return null;
-      }
-    };
-  
-    return (
-      <div>
-        <Navbar setActivePage={setActivePage} showExamples={showExamples} setShowExamples={setShowExamples} />
-        <div style={{textAlign:"center", fontSize:"20px", marginTop:"10px"}}><b>QUEUE OPERATIONS</b></div>
-        <div style={{ paddingBottom: '20px', marginTop:'0px'}}>{renderContent()}</div>
-      </div>
-    );
-  };
-  
-  const Navbar = ({ setActivePage, showExamples, setShowExamples }) => (
-    <nav style={styles.navbar}>
-      <button onClick={() => setActivePage('aim')}>Aim</button>
-      <button onClick={() => setActivePage('theory')}>Theory</button>
-      <button onClick={() => setActivePage('procedure')}>Procedure</button>
-      <button onClick={() => setActivePage('simulation')}>Simulation</button>
-      <button onClick={() => setActivePage('Code')}>Code</button>
-      <button onClick={() => setActivePage('feedback')}>Feedback</button>
-    </nav>
-  );
-  
-  const Section = ({ title, text }) => (
-    <div style={{ maxWidth: '800px', margin: 'auto', textAlign: 'left' }}>
-      <h2>{title}</h2>
-      <p style={{ whiteSpace: 'pre-line' }}>{text}</p>
-    </div>
-  );
-  
-  const styles = {
-    navbar: {
-      display: 'flex',
-      gap: '10px',
-      backgroundColor: '#333',
-      padding: '10px',
-      color: '#fff',
-      justifyContent: 'center',
-      flexWrap: 'wrap',
-    },
-    dropdown: {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      backgroundColor: '#444',
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 10,
-      boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-    },
-  };
+};
 
 export default QOP_template;

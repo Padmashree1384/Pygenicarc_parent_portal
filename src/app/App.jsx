@@ -1,26 +1,34 @@
+import React, { useEffect } from "react";
 import { useRoutes } from "react-router-dom";
 import CssBaseline from "@mui/material/CssBaseline";
 // ROOT THEME PROVIDER
-import { MatxTheme } from "./components";
+import { ParcTheme } from "./components";
 // ALL CONTEXTS
 import SettingsProvider from "./contexts/SettingsContext";
-import { AuthProvider } from "./contexts/FirebaseAuthContext";
 // ROUTES
 import routes from "./routes";
+// SCROLL TO TOP ON ROUTE CHANGE
+import ScrollToTop from "./components/ScrollToTop";
 // FAKE SERVER
-import "../__api__";
+
 
 export default function App() {
   const content = useRoutes(routes);
 
+  // Disable browser scroll restoration
+  useEffect(() => {
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+  }, []);
+
   return (
     <SettingsProvider>
-      <AuthProvider>
-        <MatxTheme>
-          <CssBaseline />
-          {content}
-        </MatxTheme>
-      </AuthProvider>
+      <ParcTheme>
+        <CssBaseline />
+        <ScrollToTop />
+        {content}
+      </ParcTheme>
     </SettingsProvider>
   );
 }

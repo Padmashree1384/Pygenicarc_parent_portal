@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useScrollToTop } from 'app/hooks/useScrollToTop';
 import {
   AppBar,
   Toolbar,
@@ -25,6 +26,7 @@ import {
   createTheme,
   ThemeProvider,
   CssBaseline,
+  Snackbar,
 } from '@mui/material';
 import {
   Timeline,
@@ -69,7 +71,7 @@ const Section = ({ title, children }) => (
       '&:hover': { transform: 'translateY(-4px)' },
     }}
   >
-    
+
     <Box sx={{ color: '#1f2937', lineHeight: 1.6 }}>{children}</Box>
   </Paper>
 );
@@ -102,18 +104,25 @@ const Navbar = ({ setActivePage, activePage }) => {
       sx={{
         color: isActive ? '#ffffff' : '#e2e8f0',
         borderRadius: 2,
-        px: { xs: 1.5, sm: 2 },
-        py: 1,
+        px: { xs: 0.8, sm: 1.5, md: 2 },
+        py: { xs: 0.5, sm: 1 },
         textTransform: 'none',
         fontWeight: 600,
-        fontSize: { xs: '0.9rem', sm: '1rem' },
-        transition: 'all 0.3s ease',
+        fontSize: { xs: '0.75rem', sm: '0.9rem', md: '1rem' },
+        minWidth: { xs: 'auto', sm: 'auto' },
+        transition: 'background-color 0.3s ease, color 0.3s ease, transform 0.3s ease',
         background: isActive ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
         '&:hover': {
           bgcolor: isActive ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.1)',
           color: '#ffffff',
           transform: 'translateY(-2px)',
         },
+        '& .MuiButton-startIcon': {
+          marginRight: { xs: 0.5, sm: 1 },
+          '& > *:first-of-type': {
+            fontSize: { xs: '1rem', sm: '1.2rem' }
+          }
+        }
       }}
     >
       {label}
@@ -135,7 +144,7 @@ const Navbar = ({ setActivePage, activePage }) => {
       difficulty: 'Intermediate',
       duration: '8 min'
     },
-  
+
   ];
 
   return (
@@ -145,50 +154,59 @@ const Navbar = ({ setActivePage, activePage }) => {
         background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%)',
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
         py: 1,
+        transform: 'translateZ(0)',
       }}
     >
-      <Toolbar sx={{ justifyContent: 'center', gap: { xs: 1, sm: 2.5 } }}>
-        <NavButton 
-          icon={<CheckCircleOutlineIcon />} 
-          label="Aim" 
-          page="aim" 
+      <Toolbar sx={{
+        justifyContent: 'center',
+        gap: { xs: 0.5, sm: 1.5, md: 2.5 },
+        px: { xs: 1, sm: 2 },
+        flexWrap: { xs: 'wrap', md: 'nowrap' },
+        minHeight: { xs: 'auto', sm: 64 },
+        py: { xs: 1, sm: 0 }
+      }}>
+        <NavButton
+          icon={<CheckCircleOutlineIcon />}
+          label="Aim"
+          page="aim"
           isActive={activePage === 'aim'}
         />
-        <NavButton 
-          icon={<LightbulbOutlinedIcon />} 
-          label="Theory" 
+        <NavButton
+          icon={<LightbulbOutlinedIcon />}
+          label="Theory"
           page="theory"
           isActive={activePage === 'theory'}
         />
-        <NavButton 
-          icon={<AssignmentOutlinedIcon />} 
-          label="Procedure" 
-          page="procedure" 
+        <NavButton
+          icon={<AssignmentOutlinedIcon />}
+          label="Procedure"
+          page="procedure"
           isActive={activePage === 'procedure'}
         />
-        
+
         {/* Enhanced Examples Dropdown */}
         <Box sx={{ position: 'relative' }}>
           <Button
             variant="text"
             onClick={handleClick}
             endIcon={
-              <KeyboardArrowDownIcon 
-                sx={{ 
+              <KeyboardArrowDownIcon
+                sx={{
                   transition: 'transform 0.3s ease',
                   transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-                }} 
+                }}
               />
             }
             sx={{
               color: '#e2e8f0',
               borderRadius: 2,
-              px: { xs: 1.5, sm: 2 },
-              py: 1,
+              px: { xs: 0.8, sm: 1.5, md: 2 },
+              py: { xs: 0.5, sm: 1 },
               textTransform: 'none',
               fontWeight: 600,
-              fontSize: { xs: '0.9rem', sm: '1rem' },
-              transition: 'all 0.3s ease',
+              fontSize: { xs: '0.75rem', sm: '0.9rem', md: '1rem' },
+              minWidth: { xs: 'auto', sm: 'auto' },
+              transition: 'background-color 0.3s ease, color 0.3s ease, transform 0.3s ease',
               background: open ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
               '&:hover': {
                 bgcolor: 'rgba(59, 130, 246, 0.15)',
@@ -199,14 +217,14 @@ const Navbar = ({ setActivePage, activePage }) => {
           >
             Examples
           </Button>
-          
+
           <Menu
             anchorEl={anchorEl}
             open={open}
             onClose={handleClose}
             PaperProps={{
-              sx: { 
-                borderRadius: 3, 
+              sx: {
+                borderRadius: 3,
                 boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
                 mt: 1,
                 minWidth: 280,
@@ -219,11 +237,11 @@ const Navbar = ({ setActivePage, activePage }) => {
             transformOrigin={{ horizontal: 'center', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
           >
-            
-            
+
+
             {/* Examples List */}
             {examples.map((example, index) => (
-              <MenuItem 
+              <MenuItem
                 key={example.id}
                 onClick={() => handleMenuItemClick(example.id)}
                 onMouseEnter={() => setHoveredExample(example.id)}
@@ -231,7 +249,7 @@ const Navbar = ({ setActivePage, activePage }) => {
                 sx={{
                   py: 2,
                   px: 3,
-                  transition: 'all 0.3s ease',
+                  transition: 'background-color 0.3s ease, transform 0.3s ease',
                   borderBottom: index < examples.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
                   '&:hover': {
                     bgcolor: 'rgba(59, 130, 246, 0.08)',
@@ -244,10 +262,10 @@ const Navbar = ({ setActivePage, activePage }) => {
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                   <Box sx={{ flex: 1 }}>
-                    <Typography 
-                      variant="subtitle1" 
-                      sx={{ 
-                        fontWeight: 600, 
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
                         color: '#1e3a8a',
                         mb: 0.5,
                       }}
@@ -255,10 +273,10 @@ const Navbar = ({ setActivePage, activePage }) => {
                       {example.title}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      <Box sx={{ 
-                        px: 1, 
-                        py: 0.5, 
-                        borderRadius: 1, 
+                      <Box sx={{
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
                         fontSize: '0.75rem',
                         fontWeight: 600,
                         background: example.color + '20',
@@ -272,44 +290,44 @@ const Navbar = ({ setActivePage, activePage }) => {
                       </Typography>
                     </Box>
                   </Box>
-                  <Box sx={{ 
-                    width: 8, 
-                    height: 8, 
-                    borderRadius: '50%', 
+                  <Box sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
                     background: example.color,
                     opacity: hoveredExample === example.id ? 1 : 0.6,
-                    transition: 'all 0.3s ease',
+                    transition: 'opacity 0.3s ease',
                   }} />
                 </Box>
               </MenuItem>
             ))}
-            
-           
+
+
           </Menu>
         </Box>
-        
-        <NavButton 
-          icon={<PlayArrowIcon />} 
-          label="Simulation" 
-          page="simulation" 
+
+        <NavButton
+          icon={<PlayArrowIcon />}
+          label="Simulation"
+          page="simulation"
           isActive={activePage === 'simulation'}
         />
-        <NavButton 
-          icon={<CodeIcon />} 
-          label="Code" 
-          page="Code" 
+        <NavButton
+          icon={<CodeIcon />}
+          label="Code"
+          page="Code"
           isActive={activePage === 'Code'}
         />
-        <NavButton 
-          icon={<QuizIcon />} 
-          label="Quiz" 
-          page="quiz" 
+        <NavButton
+          icon={<QuizIcon />}
+          label="Quiz"
+          page="quiz"
           isActive={activePage === 'quiz'}
         />
-        <NavButton 
-          icon={<FeedbackOutlinedIcon />} 
-          label="Feedback" 
-          page="feedback" 
+        <NavButton
+          icon={<FeedbackOutlinedIcon />}
+          label="Feedback"
+          page="feedback"
           isActive={activePage === 'feedback'}
         />
       </Toolbar>
@@ -331,6 +349,9 @@ const theme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        body: {
+          backgroundColor: '#ffffff',
+        },
         code: {
           fontFamily: 'inherit !important',
           backgroundColor: '#f3f4f6',
@@ -344,6 +365,20 @@ const theme = createTheme({
 
 const DFS_template = () => {
   const [activePage, setActivePage] = useState('aim');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+
+  const showSnackbar = useCallback((message, severity = 'info') => {
+    setSnackbar({ open: true, message, severity });
+  }, []);
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  useScrollToTop(activePage);
   const [expanded, setExpanded] = useState({});
   const [quizState, setQuizState] = useState({
     currentQuestion: 0,
@@ -352,6 +387,10 @@ const DFS_template = () => {
     submitted: false,
     feedback: null,
   });
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activePage]);
 
   const questions = [
     {
@@ -480,7 +519,7 @@ const DFS_template = () => {
                     Interactive Learning
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#1f2937' }}>
-                  Understand the recursive or stack-based behavior of DFS.
+                    Understand the recursive or stack-based behavior of DFS.
                   </Typography>
                 </Paper>
                 <Paper elevation={1} sx={{ p: 2, borderRadius: 2, bgcolor: 'white' }}>
@@ -488,7 +527,7 @@ const DFS_template = () => {
                     Visual Feedback
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#1f2937' }}>
-                  Visualize traversal from root to deep leaves before backtracking.
+                    Visualize traversal from root to deep leaves before backtracking.
                   </Typography>
                 </Paper>
                 <Paper elevation={1} sx={{ p: 2, borderRadius: 2, bgcolor: 'white' }}>
@@ -496,7 +535,7 @@ const DFS_template = () => {
                     Stack Visualization
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#1f2937' }}>
-                  Observe the visiting order and how nodes are pushed and popped
+                    Observe the visiting order and how nodes are pushed and popped
                   </Typography>
                 </Paper>
                 <Paper elevation={1} sx={{ p: 2, borderRadius: 2, bgcolor: 'white' }}>
@@ -504,7 +543,7 @@ const DFS_template = () => {
                     Customization
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#1f2937' }}>
-                  Control the traversal using step, run, pause, and reset options.
+                    Control the traversal using step, run, pause, and reset options.
                   </Typography>
                 </Paper>
               </Box>
@@ -576,9 +615,9 @@ const DFS_template = () => {
               <Typography variant="body1" sx={{ color: '#1f2937', mb: 2 }}>
                 <strong>Depth-First Search (DFS)</strong> s a tree traversal algorithm that explores as far as possible along each branch before backtracking. It starts from the root node and dives deep into the tree along a single branch before visiting sibling nodes.
               </Typography>
-              
-             
-            
+
+
+
             </Paper>
             <Paper
               elevation={0}
@@ -593,17 +632,17 @@ const DFS_template = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <LightbulbOutlinedIcon sx={{ color: '#3b82f6', mr: 1 }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e3a8a' }}>
-                Working Principle
+                  Working Principle
                 </Typography>
               </Box>
               <Typography variant="body1" sx={{ color: '#1f2937', mb: 2 }}>
-              DFS uses a <b>stack</b> data structure (either explicitly or via recursion). It follows the path from the root to the deepest node before backtracking and continuing with other unexplored paths.
+                DFS uses a <b>stack</b> data structure (either explicitly or via recursion). It follows the path from the root to the deepest node before backtracking and continuing with other unexplored paths.
               </Typography>
-              
-             
-            
+
+
+
             </Paper>
-          
+
             <Paper
               elevation={0}
               sx={{
@@ -654,11 +693,11 @@ const DFS_template = () => {
                     D → E → B → F → C → A
                   </Typography>
                 </Paper>
-                
+
               </Box>
               <Typography variant="body2" sx={{ color: '#1f2937' }}>
                 In a binary tree, DFS generally follows the <b>Preorder → Inorder → Postorder</b>
-                </Typography>
+              </Typography>
             </Paper>
 
             <Paper
@@ -683,10 +722,10 @@ const DFS_template = () => {
                     Advantages
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#1f2937' }}>
-                  Requires less memory compared to BFS since it stores only a single path from root to leaf.
+                    Requires less memory compared to BFS since it stores only a single path from root to leaf.
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#1f2937' }}>
-                  Can be more efficient in deeper trees where the goal is far from the root.
+                    Can be more efficient in deeper trees where the goal is far from the root.
                   </Typography>
                 </Paper>
                 <Paper elevation={1} sx={{ p: 2, borderRadius: 2, bgcolor: 'white' }}>
@@ -697,12 +736,12 @@ const DFS_template = () => {
                     Risk of infinite loops in cyclic graphs.
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#1f2937' }}>
-                  Not guaranteed to find the shortest path in weighted or unbalanced trees.
+                    Not guaranteed to find the shortest path in weighted or unbalanced trees.
                   </Typography>
                 </Paper>
-                
+
               </Box>
-              
+
             </Paper>
 
             <Paper
@@ -997,7 +1036,7 @@ const DFS_template = () => {
                 pl: 2,
               }}
             >
-            Example 1
+              Example 1
             </Typography>
             <Paper
               elevation={0}
@@ -1028,7 +1067,7 @@ const DFS_template = () => {
                 pl: 2,
               }}
             >
-            Example 2
+              Example 2
             </Typography>
             <Paper
               elevation={0}
@@ -1040,18 +1079,16 @@ const DFS_template = () => {
                 border: '1px solid #bbf7d0',
               }}
             >
-             
+
               <DFS_EX2 />
             </Paper>
           </>
         );
-      
-         
-        
+
       case 'simulation':
-        return <DFSLab />;
+        return <DFSLab showSnackbar={showSnackbar} />;
       case 'Code':
-        return <DFS_Monoco />;
+        return <DFS_Monoco showSnackbar={showSnackbar} />;
       case 'feedback':
         return (
           <>
@@ -1128,7 +1165,7 @@ const DFS_template = () => {
                 border: '1px solid #bbf7d0',
               }}
             >
-              
+
               <Typography variant="body2" sx={{ color: '#1f2937', mb: 4 }}>
                 Mark as complete Save for later
               </Typography>
@@ -1276,9 +1313,10 @@ const DFS_template = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', bgcolor: 'white' }}>
+      <Box>
         <Navbar setActivePage={setActivePage} activePage={activePage} />
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Container maxWidth="lg" sx={{ py: 4, willChange: 'transform' }}>
+          {/* This ref is no longer needed with the window.scrollTo fix */}
           <Typography
             variant="h5"
             component="h1"
@@ -1287,13 +1325,22 @@ const DFS_template = () => {
               color: '#1e3a8a',
               mb: 4,
               textAlign: 'center',
-              transform: 'translateZ(0)',
             }}
           >
             DEPTH FIRST SEARCH
           </Typography>
           {renderContent()}
         </Container>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }} variant="filled">
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </ThemeProvider>
   );

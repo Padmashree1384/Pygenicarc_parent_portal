@@ -28,12 +28,12 @@ const aestheticTheme = createTheme({
   palette: {
     mode: 'light',
     primary: { main: '#2c3e50' },
-    secondary: { main: '#89CFF0' }, 
+    secondary: { main: '#89CFF0' },
     success: { main: '#b9fbc0' },
-    warning: { main: '#FFD700' },   
-    info: { main: '#E0E0E0' },      
+    warning: { main: '#FFD700' },
+    info: { main: '#E0E0E0' },
     background: {
-      default: 'linear-gradient(135deg, #f0f2f5 0%, #e0e7ff 100%)', 
+      default: 'linear-gradient(135deg, #f0f2f5 0%, #e0e7ff 100%)',
       paper: '#ffffff',
     },
     text: {
@@ -72,24 +72,6 @@ const aestheticTheme = createTheme({
         },
       },
     },
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 14,
-          textTransform: 'none',
-          fontWeight: 700,
-          border: 'none',
-          background: 'linear-gradient(90deg, #a0c4ff 0%, #b9fbc0 100%)',
-          color: '#2c3e50',
-          boxShadow: '0 2px 8px 0 rgba(160,196,255,0.10)',
-          transition: 'background 0.2s, box-shadow 0.2s',
-          '&:hover': {
-            background: 'linear-gradient(90deg, #b9fbc0 0%, #a0c4ff 100%)',
-            boxShadow: '0 4px 16px 0 rgba(160,196,255,0.18)',
-          },
-        },
-      },
-    },
     MuiIconButton: {
       styleOverrides: {
         root: {
@@ -115,7 +97,7 @@ const aestheticTheme = createTheme({
     },
   },
 });
-      
+
 const styles = {
   container: {
     p: { xs: 2, sm: 4 },
@@ -124,7 +106,7 @@ const styles = {
   },
   canvasWrapper: {
     position: 'relative',
-    borderRadius: 20,
+    borderRadius: '24px',
     overflow: 'hidden',
     boxShadow: '0 8px 32px 0 rgba(44, 62, 80, 0.12), 0 1.5px 6px 0 rgba(160,196,255,0.08)',
     background: 'rgba(255,255,255,0.95)',
@@ -174,19 +156,19 @@ const DFS_EX2 = () => {
     let searchComplete = false;
     let history = [];
     let pInstance = null;
-    let traversedEdges = []; // MODIFIED
+    let traversedEdges = [];
 
     function layoutTree(root, x, y, xSpacing, ySpacing) {
-        root.targetX = x;
-        root.targetY = y;
-        if (root.children.length === 2) {
-            layoutTree(root.children[0], x - xSpacing, y + ySpacing, xSpacing / 2, ySpacing);
-            layoutTree(root.children[1], x + xSpacing, y + ySpacing, xSpacing / 2, ySpacing);
-        } else if (root.children.length === 1) {
-            layoutTree(root.children[0], x, y + ySpacing, xSpacing / 2, ySpacing);
-        }
+      root.targetX = x;
+      root.targetY = y;
+      if (root.children.length === 2) {
+        layoutTree(root.children[0], x - xSpacing, y + ySpacing, xSpacing / 2, ySpacing);
+        layoutTree(root.children[1], x + xSpacing, y + ySpacing, xSpacing / 2, ySpacing);
+      } else if (root.children.length === 1) {
+        layoutTree(root.children[0], x, y + ySpacing, xSpacing / 2, ySpacing);
+      }
     }
-    
+
     class Node {
       constructor(value, p) {
         this.value = value;
@@ -199,7 +181,7 @@ const DFS_EX2 = () => {
         this.found = false;
         this.isCurrent = false;
         this.visitOrder = null;
-        this.scale = 1; 
+        this.scale = 1;
         this.targetScale = 1;
         this.color = p.color(aestheticTheme.palette.info.main);
         this.targetColor = p.color(aestheticTheme.palette.info.main);
@@ -253,11 +235,11 @@ const DFS_EX2 = () => {
 
         nodes = [A, B, C, D, E, F, G, H, I, J, K];
         root = A;
-        
+
         const w = p.width;
         const h = p.height;
         layoutTree(A, w / 2, h * 0.15, w * 0.25, h * 0.22);
-        
+
         nodes.forEach(node => {
           node.x = node.targetX;
           node.y = node.targetY;
@@ -267,8 +249,8 @@ const DFS_EX2 = () => {
       p.setup = () => {
         const container = sketchRef.current;
         if (container) {
-            const canvas = p.createCanvas(container.offsetWidth, container.offsetHeight);
-            canvas.parent(container);
+          const canvas = p.createCanvas(container.offsetWidth, container.offsetHeight);
+          canvas.parent(container);
         }
         preloadAudio();
         p.reset();
@@ -284,7 +266,7 @@ const DFS_EX2 = () => {
           dfsStep();
         }
       };
-      
+
       const updateNodeStates = (p) => {
         for (let node of nodes) {
           if (node.found) {
@@ -312,17 +294,26 @@ const DFS_EX2 = () => {
             p.line(node.x, node.y, child.x, child.y);
           }
         }
-        
-        // MODIFIED: Draw persistent, dotted highlight lines
-        p.stroke(p.color(aestheticTheme.palette.warning.main));
-        p.strokeWeight(4);
-        p.drawingContext.setLineDash([8, 6]);
 
         for (const edge of traversedEdges) {
-            p.line(edge.from.x, edge.from.y, edge.to.x, edge.to.y);
+          p.push();
+          const fromVec = p.createVector(edge.from.x, edge.from.y);
+          const toVec = p.createVector(edge.to.x, edge.to.y);
+          p.stroke(p.color(aestheticTheme.palette.warning.main));
+          p.strokeWeight(3);
+          p.drawingContext.setLineDash([8, 6]);
+          p.line(fromVec.x, fromVec.y, toVec.x, toVec.y);
+          p.drawingContext.setLineDash([]);
+          const midPoint = p5.Vector.lerp(fromVec, toVec, 0.5);
+          const angle = p.atan2(toVec.y - fromVec.y, toVec.x - fromVec.x);
+          let arrowSize = 10;
+          p.translate(midPoint.x, midPoint.y);
+          p.rotate(angle);
+          p.fill(p.color(aestheticTheme.palette.warning.main));
+          p.noStroke();
+          p.triangle(0, 0, -arrowSize * 1.5, -arrowSize * 0.7, -arrowSize * 1.5, arrowSize * 0.7);
+          p.pop();
         }
-
-        p.drawingContext.setLineDash([]);
       };
 
       const drawNodes = (p) => {
@@ -364,20 +355,20 @@ const DFS_EX2 = () => {
           visitCounter,
           stepNumber,
           searchComplete,
+          traversedEdges: [...traversedEdges],
         });
-        
+
         const lastCurrent = current;
         current = stack.pop();
         nodes.forEach((n) => (n.isCurrent = n === current));
 
-        if (lastCurrent && current) { // MODIFIED
-            traversedEdges.push({ from: lastCurrent, to: current });
+        if (lastCurrent && current) {
+          traversedEdges.push({ from: lastCurrent, to: current });
         }
-        
+
         if (!current.visited) {
           current.visited = true;
           current.visitOrder = visitCounter++;
-          
           if (current.value === DEFAULT_TARGET) {
             current.found = true;
             setStatusText(`✅ Found '${DEFAULT_TARGET}'!`);
@@ -389,17 +380,15 @@ const DFS_EX2 = () => {
             nodes.forEach((n) => (n.isCurrent = false));
             return;
           }
-          
           setStatusText(`🔍 Visiting: ${current.value}`);
           setStepList((prev) => [...prev, `Step ${stepNumber++}: Visiting '${current.value}'`]);
           playSound('step');
-          
           for (let i = current.children.length - 1; i >= 0; i--) {
             const child = current.children[i];
             if (!child.visited) stack.push(child);
           }
         } else {
-            if (running && !paused) dfsStep();
+          if (running && !paused) dfsStep();
         }
       };
 
@@ -408,7 +397,7 @@ const DFS_EX2 = () => {
         visitCounter = 1;
         stepNumber = 1;
         history = [];
-        traversedEdges = []; // MODIFIED
+        traversedEdges = [];
         setStepList([]);
         setStatusText('Status: Ready');
         stack = [root];
@@ -419,30 +408,25 @@ const DFS_EX2 = () => {
         setIsPlaying(false);
         p.loop();
       };
-      
       p.step = () => {
         if (searchComplete) return;
         paused = true;
         setIsPlaying(false);
         dfsStep();
       };
-      
       p.run = () => {
         if (searchComplete || (running && !paused)) return;
         running = true;
         paused = false;
         setIsPlaying(true);
       };
-      
       p.pause = () => {
         paused = true;
         running = false;
         setIsPlaying(false);
       };
-      
       p.prevStep = () => {
         if (history.length === 0) return;
-        traversedEdges.pop(); // MODIFIED
         paused = true;
         setIsPlaying(false);
         const prev = history.pop();
@@ -451,15 +435,15 @@ const DFS_EX2 = () => {
           node.color = p.color(prev.nodes[i].color.levels);
           node.targetColor = p.color(prev.nodes[i].targetColor.levels);
         });
-        stack = prev.stack.map(sNode => nodes.find(n => n.value === sNode.value));
-        current = prev.current ? nodes.find(n => n.value === prev.current.value) : null;
+        stack = prev.stack.map((sNode) => nodes.find((n) => n.value === sNode.value));
+        current = prev.current ? nodes.find((n) => n.value === prev.current.value) : null;
         visitCounter = prev.visitCounter;
         stepNumber = prev.stepNumber;
         searchComplete = prev.searchComplete;
+        traversedEdges = prev.traversedEdges;
         setStepList((prevList) => prevList.slice(0, -1));
-        const lastStatus = history.length > 0 ? (current ? `🔍 Visiting: ${current.value}` : 'Status: Ready') : 'Status: Ready';
+        const lastStatus = history.length > 0 ? history[history.length - 1].statusText : 'Status: Step Reverted';
         setStatusText(lastStatus);
-        nodes.forEach(n => n.isCurrent = n === current);
       };
     };
 
@@ -487,7 +471,7 @@ const DFS_EX2 = () => {
             Element to be found: "{DEFAULT_TARGET}"
           </Typography>
         </Box>
-        
+
         <Box sx={{ p: 1, mb: 2, display: 'flex', justifyContent: 'center', gap: 1.5 }}>
           <Tooltip title="Reset">
             <IconButton onClick={() => sketchRef.current.reset()}><RestartAltIcon /></IconButton>
@@ -505,7 +489,7 @@ const DFS_EX2 = () => {
             <IconButton onClick={() => sketchRef.current.pause()}><PauseIcon /></IconButton>
           </Tooltip>
         </Box>
-        
+
         <Box sx={(theme) => ({ mb: theme.spacing(3), display: 'flex', justifyContent: 'center', width: '100%' })}>
           <Stack direction="row" spacing={2} sx={(theme) => ({ p: theme.spacing(1.5), borderRadius: 2, background: 'rgba(255,255,255,0.7)', flexWrap: 'wrap', justifyContent: 'center' })}>
             <LegendItem color={aestheticTheme.palette.warning.main} text="Current" />
@@ -514,17 +498,17 @@ const DFS_EX2 = () => {
             <LegendItem color={aestheticTheme.palette.info.main} text="Not Visited" />
           </Stack>
         </Box>
-        
-        <Grid container spacing={{ xs: 2, md: 4 }} justifyContent="center" alignItems="flex-start">
-          <Grid item xs={12} md={7} lg={8}>
+
+        <Grid container spacing={{ xs: 2, md: 4 }} justifyContent="center" alignItems="stretch">
+          <Grid item xs={12} md={7}>
             <Box sx={styles.canvasWrapper}>
               <Box sx={styles.canvasBox}>
                 <div ref={sketchRef} style={{ width: '100%', height: '100%' }} />
               </Box>
             </Box>
           </Grid>
-          <Grid item xs={12} md={5} lg={4}>
-            <Paper sx={(theme) => ({ p: { xs: 1.5, md: 2 }, width: '100%', display: 'flex', flexDirection: 'column', gap: theme.spacing(2), height: '100%', mx: 'auto' })} elevation={3}>
+          <Grid item xs={12} md={4}>
+            <Paper sx={(theme) => ({ p: { xs: 1.5, md: 2 }, width: { xs: '100%', md: 320 }, minWidth: 260, maxWidth: 350, display: 'flex', flexDirection: 'column', gap: theme.spacing(2), mx: 'auto' })} elevation={3}>
               <Box>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
                   <Typography variant="h6">Execution Steps</Typography>

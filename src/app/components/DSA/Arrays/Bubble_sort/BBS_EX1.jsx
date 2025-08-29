@@ -1,17 +1,109 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import p5 from 'p5';
+import {
+  Box,
+  Grid,
+  Paper,
+  Stack,
+  Typography,
+  ThemeProvider,
+  createTheme,
+  CssBaseline,
+  Tooltip,
+  IconButton,
+} from '@mui/material';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+
+// Import sound files
 import stepSoundFile from '/step.mp3';
 import successSoundFile from '/success.mp3';
 
-const BBS_EX1 = () => {
-  const canvasRef = useRef();
-  const toastRef = useRef();
-  const [status, setStatus] = useState('Step: Initialize array');
-  const [controlsDisabled, setControlsDisabled] = useState(false);
-  const [stepList, setStepList] = useState([]);
+// --- STYLING DEFINITIONS ---
+const aestheticTheme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: { main: '#2c3e50' },
+    info: { main: '#e5e7e9' },         // Unsorted Color
+    success: { main: '#abebc6' },     // Sorted
+    warning: { main: '#f9e79f' },     // Comparing
+    error: { main: '#f5b7b1' },       // Swapping
+    background: {
+      default: 'linear-gradient(135deg, #f0f2f5 0%, #e0e7ff 100%)',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#2c3e50',
+      secondary: '#7f8c8d',
+    },
+  },
+  typography: {
+    fontFamily: ['"Inter"', '"Segoe UI"', 'Tahoma', 'Geneva', 'Verdana', 'sans-serif'].join(','),
+    h5: { fontWeight: 700, letterSpacing: 1, color: '#2c3e50' },
+    h6: { fontWeight: 700, color: '#2c3e50' },
+    body1: { fontWeight: 600 },
+    body2: { fontSize: '0.95rem' },
+  },
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          borderRadius: 20,
+          boxShadow: '0 8px 32px 0 rgba(44, 62, 80, 0.12), 0 1.5px 6px 0 rgba(160,196,255,0.08)',
+          background: 'rgba(255,255,255,0.95)',
+          backdropFilter: 'blur(2px)',
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          color: '#2c3e50',
+          background: '#ffffff',
+          border: '1px solid #e0e0e0',
+          '&:hover': { background: '#f0f2f5', borderColor: '#bdbdbd' }
+        }
+      }
+    },
+  },
+});
 
-  const playStepSound = () => new Audio(stepSoundFile).play();
-  const playSuccessSound = () => new Audio(successSoundFile).play();
+const styles = {
+  container: {
+    p: { xs: 2, sm: 4 },
+    background: 'linear-gradient(135deg, #f0f2f5 0%, #e0e7ff 100%)',
+  },
+  canvasWrapper: {
+    position: 'relative', borderRadius: '24px', overflow: 'hidden',
+    boxShadow: '0 8px 32px 0 rgba(44, 62, 80, 0.12), 0 1.5px 6px 0 rgba(160,196,255,0.08)',
+    background: 'rgba(255,255,255,0.95)',
+    display: 'flex', justifyContent: 'center', alignItems: 'center',
+  },
+  canvasBox: { width: '100%', maxWidth: 800, aspectRatio: '16 / 9' },
+  stepListBox: {
+    height: '250px', overflowY: 'auto', mt: 1, p: 1.5,
+    borderRadius: '12px',
+    background: 'linear-gradient(145deg, #e2e8f0, #f8fafc)',
+    boxShadow: 'inset 4px 4px 8px #d1d9e6, inset -4px -4px 8px #ffffff',
+    '&::-webkit-scrollbar': { width: '8px' },
+    '&::-webkit-scrollbar-thumb': { background: '#bdc3c7', borderRadius: '4px' },
+  },
+};
+
+const BBS_EX1 = () => {
+  const sketchRef = useRef();
+  const toastRef = useRef();
+  const stepListRef = useRef(null);
+  const [status, setStatus] = useState('Ready to sort');
+  const [stepList, setStepList] = useState([]);
+  const [isSorted, setIsSorted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const audioRefs = useRef({});
 
   const stateRef = useRef({
     arr: [],
@@ -20,140 +112,218 @@ const BBS_EX1 = () => {
     j: 0,
     stepCount: 0,
     sorting: false,
-    paused: false,
+    paused: true,
     runMode: false,
-    successPlayed: false
+    successPlayed: false,
+    animation: { inProgress: false, fromIndex: -1, toIndex: -1, progress: 0 },
   });
 
   useEffect(() => {
+    if (stepListRef.current) {
+      stepListRef.current.scrollTop = stepListRef.current.scrollHeight;
+    }
+  }, [stepList]);
+
+  useLayoutEffect(() => {
+    let pInstance = null;
+
+    const preloadAudio = () => {
+      try {
+        audioRefs.current.step = new Audio(stepSoundFile);
+        audioRefs.current.success = new Audio(successSoundFile);
+      } catch (e) { console.error('Audio files not found.', e); }
+    };
+
+    const playSound = (soundType) => {
+      if (audioRefs.current[soundType]) {
+        audioRefs.current[soundType].currentTime = 0;
+        audioRefs.current[soundType].play().catch((e) => console.error('Error playing sound:', e));
+      }
+    };
+
     const sketch = (p) => {
       p.setup = () => {
-        const canvas = p.createCanvas(800, 400);
-        canvas.parent(canvasRef.current);
+        const container = sketchRef.current;
+        const canvas = p.createCanvas(container.offsetWidth, container.offsetHeight);
+        canvas.parent(container);
         p.textAlign(p.CENTER, p.CENTER);
-        p.textSize(16);
-        resetState();
+        p.textFont(aestheticTheme.typography.fontFamily);
+        preloadAudio();
+        p.reset();
       };
 
       p.draw = () => {
+        p.background(aestheticTheme.palette.background.paper);
+        drawArray(p);
         const s = stateRef.current;
-        p.background(255);
-        drawArray(p, s.arr, s.j);
 
-        if (s.sorting && !s.paused && s.runMode) {
-          bubbleSortStep(false); // Run mode - no sound
+        if (s.animation.inProgress) {
+          s.animation.progress += 0.05;
+          if (s.animation.progress >= 1) {
+            endAnimation();
+          }
+        } else if (s.sorting && !s.paused && s.runMode && p.frameCount % 20 === 0) {
+          performStep();
         }
       };
 
-      const drawArray = (p, arr, j) => {
-        const barWidth = p.width / arr.length;
-        for (let i = 0; i < arr.length; i++) {
-          const h = p.map(arr[i], 0, Math.max(...arr), 0, p.height - 50);
+      const drawArray = (p) => {
+        const { arr, i: outerI, j, animation } = stateRef.current;
+        if (arr.length === 0) return;
 
-          if (i === j || i === j + 1) {
-            p.fill(255, 0, 0); // Comparing
-          } else {
-            p.fill(100, 150, 255); // Default
+        const barWidth = (p.width - 60) / arr.length;
+        const startX = p.width / 2 - (arr.length * barWidth) / 2;
+        const yPos = p.height - 40;
+
+        for (let i = 0; i < arr.length; i++) {
+          const h = p.map(arr[i], 0, Math.max(...stateRef.current.originalArr), 0, p.height - 100);
+          let xPos = startX + i * barWidth;
+
+          let barColor;
+          if (isSorted) barColor = p.color(aestheticTheme.palette.success.main);
+          else if (animation.inProgress && (i === animation.fromIndex || i === animation.toIndex)) barColor = p.color(aestheticTheme.palette.error.main);
+          else if ((i === j || i === j + 1) && stateRef.current.sorting) barColor = p.color(aestheticTheme.palette.warning.main);
+          else if (i >= arr.length - outerI) barColor = p.color(aestheticTheme.palette.success.main);
+          else barColor = p.color(aestheticTheme.palette.info.main);
+
+          if (animation.inProgress) {
+            if (i === animation.fromIndex) {
+              xPos = p.lerp(startX + animation.fromIndex * barWidth, startX + animation.toIndex * barWidth, animation.progress);
+            } else if (i === animation.toIndex) {
+              xPos = p.lerp(startX + animation.toIndex * barWidth, startX + animation.fromIndex * barWidth, animation.progress);
+            }
           }
 
-          p.rect(i * barWidth, p.height - h, barWidth - 5, h);
-          p.fill(0);
-          p.text(arr[i], i * barWidth + barWidth / 2, p.height - h - 20);
+          p.fill(barColor);
+          p.stroke(aestheticTheme.palette.primary.main);
+          p.strokeWeight(2);
+          p.rect(xPos, yPos - h, barWidth, h);
+
+          p.noStroke();
+          p.fill(aestheticTheme.palette.text.primary);
+          p.textSize(Math.max(12, barWidth * 0.2));
+          p.text(arr[i], xPos + barWidth / 2, yPos - h - 20);
         }
       };
 
-      const bubbleSortStep = (withSound = false) => {
+      const performStep = () => {
         const s = stateRef.current;
         const arr = s.arr;
+        if (isSorted || s.animation.inProgress) return;
 
         if (s.i < arr.length - 1) {
           if (s.j < arr.length - s.i - 1) {
             const a = arr[s.j];
             const b = arr[s.j + 1];
 
+            s.stepCount++;
             let stepMessage;
+
             if (a > b) {
-              [arr[s.j], arr[s.j + 1]] = [b, a];
-              s.stepCount++;
               stepMessage = `Step ${s.stepCount}: Swapped ${b} and ${a}`;
+              s.animation = { inProgress: true, fromIndex: s.j, toIndex: s.j + 1, progress: 0 };
+              setIsAnimating(true);
+              s.paused = true;
             } else {
-              s.stepCount++;
               stepMessage = `Step ${s.stepCount}: Compared ${a} and ${b}, no swap`;
+              s.j++;
             }
 
             setStatus(stepMessage);
             setStepList(prev => [...prev, stepMessage]);
-            if (withSound) playStepSound();
-            s.j++;
+            playSound('step');
           } else {
             s.j = 0;
             s.i++;
           }
         } else {
-          s.sorting = false;
-          s.runMode = false;
-          setControlsDisabled(true);
-          const message = `✅ Sorting Complete in ${s.stepCount} steps`;
-          setStatus(message);
-          setStepList(prev => [...prev, message]);
-          if (!s.successPlayed) {
-            playSuccessSound();
-            s.successPlayed = true;
-          }
+          finishSort();
         }
       };
 
-      canvasRef.current.step = () => {
+      const endAnimation = () => {
         const s = stateRef.current;
-        if (s.sorting && !s.paused) return;
-        if (!s.sorting) {
-          resetState();
-          s.sorting = true;
+        const { fromIndex, toIndex } = s.animation;
+        [s.arr[fromIndex], s.arr[toIndex]] = [s.arr[toIndex], s.arr[fromIndex]];
+        s.animation.inProgress = false;
+        s.j++;
+        setIsAnimating(false);
+        if (!s.runMode) {
           s.paused = true;
-          s.runMode = false;
-        }
-        if (s.sorting && !controlsDisabled) {
-          bubbleSortStep(true); // Manual step with sound
+        } else {
+          s.paused = false;
         }
       };
 
-      canvasRef.current.run = () => {
+      const finishSort = () => {
         const s = stateRef.current;
-        if (!s.sorting) {
-          resetState();
-          s.sorting = true;
+        const message = `✅ Sorting Complete in ${s.stepCount} steps!`;
+        setStatus(message);
+        if (!isSorted) setStepList(prev => [...prev, message]);
+        if (!s.successPlayed) {
+          playSound('success');
+          s.successPlayed = true;
         }
+        s.sorting = false;
+        s.runMode = false;
+        s.paused = true;
+        setIsPlaying(false);
+        setIsSorted(true);
+      };
+
+      p.reset = () => {
+        const s = stateRef.current;
+        s.arr = [...s.originalArr];
+        s.i = 0;
+        s.j = 0;
+        s.stepCount = 0;
+        s.sorting = false;
+        s.paused = true;
+        s.runMode = false;
+        s.successPlayed = false;
+        s.animation = { inProgress: false, fromIndex: -1, toIndex: -1, progress: 0 };
+        setStatus('Ready to sort');
+        setStepList([]);
+        setIsSorted(false);
+        setIsPlaying(false);
+        setIsAnimating(false);
+      };
+
+      p.step = () => {
+        if (isSorted) return;
+        if (!stateRef.current.sorting) stateRef.current.sorting = true;
+        performStep();
+      };
+
+      p.run = () => {
+        if (isSorted) return;
+        const s = stateRef.current;
+        if (!s.sorting) s.sorting = true;
         s.paused = false;
         s.runMode = true;
+        setIsPlaying(true);
       };
 
-      canvasRef.current.pause = () => {
+      p.pause = () => {
         stateRef.current.paused = true;
         stateRef.current.runMode = false;
+        setIsPlaying(false);
       };
 
-      canvasRef.current.reset = () => {
-        resetState();
-        setStepList([]);
-      };
-
-      const resetState = () => {
-        const arr = [...stateRef.current.originalArr];
-        stateRef.current.arr = arr;
-        stateRef.current.i = 0;
-        stateRef.current.j = 0;
-        stateRef.current.stepCount = 0;
-        stateRef.current.sorting = false;
-        stateRef.current.paused = false;
-        stateRef.current.runMode = false;
-        stateRef.current.successPlayed = false;
-        setStatus('Step: Initialize array');
-        setControlsDisabled(false);
-      };
+      pInstance = p;
     };
 
-    const p5Instance = new p5(sketch);
-    return () => p5Instance.remove();
+    const p5Instance = new p5(sketch, sketchRef.current);
+    if (sketchRef.current) {
+      Object.assign(sketchRef.current, {
+        reset: p5Instance.reset,
+        step: p5Instance.step,
+        run: p5Instance.run,
+        pause: p5Instance.pause,
+      });
+    }
+
+    return () => { p5Instance.remove(); };
   }, []);
 
   const copySteps = async () => {
@@ -175,53 +345,93 @@ const BBS_EX1 = () => {
   };
 
   return (
-    <div style={{ fontFamily: 'Arial', textAlign: 'center', marginTop: 20 }}>
-      <h1>Bubble Sort Visualizer</h1>
+    <ThemeProvider theme={aestheticTheme}>
+      <CssBaseline />
+      <Box sx={styles.container}>
+        <Box sx={{ mb: 2, textAlign: 'center' }}>
+          <Typography variant="h5" gutterBottom>
+            Example 1
+          </Typography>
+        </Box>
 
-      <div style={{ marginBottom: 20 }}>
-        <button onClick={() => canvasRef.current.reset()}>Reset</button>
-        <button onClick={() => canvasRef.current.step()} disabled={controlsDisabled}>Next Step</button>
-        <button onClick={() => canvasRef.current.run()} disabled={controlsDisabled}>Run</button>
-        <button onClick={() => canvasRef.current.pause()}>Pause</button>
-      </div>
+        {/* --- THIS IS THE CORRECTED PART --- */}
+        <Box sx={{ p: 1, mb: 2, display: 'flex', justifyContent: 'center', gap: 1.5 }}>
+          <Tooltip title="Reset">
+            <IconButton onClick={() => sketchRef.current.reset()}><RestartAltIcon /></IconButton>
+          </Tooltip>
+          <Tooltip title="Next Step">
+            <IconButton onClick={() => sketchRef.current.step()} disabled={isSorted || isPlaying || isAnimating}><ArrowForwardIcon /></IconButton>
+          </Tooltip>
+          <Tooltip title={isPlaying ? "Playing" : "Run"}>
+            <IconButton onClick={() => sketchRef.current.run()} disabled={isSorted || isPlaying || isAnimating} sx={{ background: isPlaying ? aestheticTheme.palette.success.main : '#ffffff' }}>
+              <PlayArrowIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Pause">
+            <IconButton onClick={() => sketchRef.current.pause()} disabled={isSorted || !isPlaying}><PauseIcon /></IconButton>
+          </Tooltip>
+        </Box>
 
-      <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 10 }}>{status}</div>
+        <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+          <Stack direction="row" spacing={2} sx={{ p: 1.5, borderRadius: 2, background: 'rgba(255,255,255,0.7)', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <LegendItem color={aestheticTheme.palette.warning.main} text="Comparing" />
+            <LegendItem color={aestheticTheme.palette.error.main} text="Swapping" />
+            <LegendItem color={aestheticTheme.palette.success.main} text="Sorted" />
+            <LegendItem color={aestheticTheme.palette.info.main} text="Unsorted" />
+          </Stack>
+          <Typography variant="body1" color="text.primary" sx={{ mt: 2 }}>
+            Status: {status}
+          </Typography>
+        </Box>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '40px' }}>
-        <div ref={canvasRef}></div>
-        <div style={{ width: 300 }}>
-          <h3>Sort Steps</h3>
-          <textarea
-            rows="12"
-            style={{ width: '100%', padding: 10, fontSize: 16, borderRadius: 6, border: '1px solid #ccc' }}
-            value={stepList.join('\n')}
-            readOnly
-          ></textarea>
-          <button onClick={copySteps} style={{ marginTop: 10, padding: '6px 12px', fontSize: 14 }}>
-            📋 Copy Steps to Clipboard
-          </button>
-        </div>
-      </div>
+        <Grid container spacing={{ xs: 2, md: 4 }} justifyContent="center" alignItems="stretch">
+          <Grid item xs={12} md={8}>
+            <Box sx={styles.canvasWrapper}>
+              <Box sx={styles.canvasBox}>
+                <div ref={sketchRef} style={{ width: '100%', height: '100%' }} />
+              </Box>
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: { xs: 1.5, md: 2 }, width: '100%', display: 'flex', flexDirection: 'column', gap: 2, mx: 'auto' }}>
+              <Box>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="h6">Execution Steps</Typography>
+                  <Tooltip title="Copy Steps">
+                    <IconButton onClick={copySteps} size="small">
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+                <Box ref={stepListRef} sx={styles.stepListBox}>
+                  {stepList.map((step, index) => (
+                    <Typography key={index} variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', mb: 0.5 }}>
+                      {step}
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
 
       <div ref={toastRef} style={{
-        visibility: 'hidden',
-        minWidth: '200px',
-        backgroundColor: '#323232',
-        color: '#fff',
-        textAlign: 'center',
-        borderRadius: '8px',
-        padding: '12px 16px',
-        position: 'fixed',
-        bottom: '30px',
-        right: '30px',
-        zIndex: 9999,
-        fontSize: '14px',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-        opacity: 0,
+        visibility: 'hidden', minWidth: '200px', backgroundColor: '#323232', color: '#fff',
+        textAlign: 'center', borderRadius: '8px', padding: '12px 16px', position: 'fixed',
+        bottom: '30px', right: '30px', zIndex: 9999, fontSize: '14px',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.3)', opacity: 0,
         transition: 'visibility 0s, opacity 0.3s ease-in-out'
       }}></div>
-    </div>
+    </ThemeProvider>
   );
 };
+
+const LegendItem = ({ color, text }) => (
+  <Stack direction="row" spacing={1} alignItems="center">
+    <Box sx={{ width: 18, height: 18, borderRadius: '50%', backgroundColor: color, border: '2px solid rgba(0,0,0,0.1)' }} />
+    <Typography variant="body2" sx={{ fontWeight: 500 }}>{text}</Typography>
+  </Stack>
+);
 
 export default BBS_EX1;

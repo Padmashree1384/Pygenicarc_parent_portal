@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import Scrollbar from "react-perfect-scrollbar";
 import styled from "@mui/material/styles/styled";
 
-import { MatxVerticalNav } from "app/components";
+import { ParcVerticalNav } from "app/components";
 import useSettings from "app/hooks/useSettings";
 import navigations from "app/navigations";
 
@@ -45,7 +45,7 @@ export default function Sidenav({ children }) {
     <Fragment>
       <StyledScrollBar options={{ suppressScrollX: true }}>
         {children}
-        <MatxVerticalNav items={navigations} />
+        <ParcVerticalNav items={navigations} />
       </StyledScrollBar>
 
       <SideNavMobile onClick={() => updateSidebarMode({ mode: "close" })} />
