@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -40,24 +41,44 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SpeedIcon from '@mui/icons-material/Speed';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import LockIcon from '@mui/icons-material/Lock';
 
-// Import the actual components for Bubble Sort
 import BBS_EX1 from './BBS_EX1';
 import BBS_EX2 from './BBS_EX2';
 import BBSLab from './BBSLab';
 import BBS_Monoco from './BBS_Monoco';
 import { useScrollToTop } from 'app/hooks/useScrollToTop';
 
-// Debounce function to limit scroll event frequency
-const debounce = (func, wait) => {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(null, args), wait);
-  };
-};
+const LockOverlay = () => (
+  <Box
+    sx={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 1301,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      p: 2
+    }}
+  >
+    <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, boxShadow: 3 }}>
+      <LockIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
+      <Typography variant="h4" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>Module Locked</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        You must first pass the "Binary Search" quiz to unlock this module.
+      </Typography>
+      <Button component="a" href="/dashboard/roadmap" variant="contained">
+        Back to Roadmap
+      </Button>
+    </Paper>
+  </Box>
+);
 
-// Navbar Component
 const Navbar = ({ setActivePage, activePage }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [hoveredExample, setHoveredExample] = useState(null);
@@ -334,6 +355,8 @@ const theme = createTheme({
 });
 
 const BBS_template = () => {
+  const isUnlocked = localStorage.getItem('bubbleSortUnlocked') === 'true';
+  const navigate = useNavigate();
   const [activePage, setActivePage] = useState('aim');
   useScrollToTop(activePage);
 
@@ -356,6 +379,7 @@ const BBS_template = () => {
     selectedAnswer: '',
     submitted: false,
     feedback: null,
+    passed: false,
   });
 
   const questions = [
@@ -372,6 +396,12 @@ const BBS_template = () => {
       explanation: 'The core idea of Bubble Sort is to step through the list, compare adjacent elements, and swap them if they are not in the correct order.',
     },
   ];
+
+  const handleNextStep = () => {
+    localStorage.setItem('selectionSortUnlocked', 'true');
+    localStorage.setItem('expandLevel3', 'true');
+    navigate('/dashboard/roadmap');
+  };
 
   const handleQuizAnswer = (value) => {
     setQuizState((prev) => ({ ...prev, selectedAnswer: value }));
@@ -393,13 +423,22 @@ const BBS_template = () => {
   };
 
   const handleQuizNext = () => {
-    setQuizState((prev) => ({
-      ...prev,
-      currentQuestion: prev.currentQuestion + 1,
-      selectedAnswer: '',
-      submitted: false,
-      feedback: null,
-    }));
+    const nextQuestionIndex = quizState.currentQuestion + 1;
+    if (nextQuestionIndex < questions.length) {
+      setQuizState((prev) => ({
+        ...prev,
+        currentQuestion: nextQuestionIndex,
+        selectedAnswer: '',
+        submitted: false,
+        feedback: null,
+      }));
+    } else {
+      if (quizState.score === questions.length) {
+        setQuizState(prev => ({ ...prev, passed: true, currentQuestion: nextQuestionIndex }));
+      } else {
+        setQuizState(prev => ({ ...prev, passed: false, currentQuestion: nextQuestionIndex }));
+      }
+    }
   };
 
   const handleQuizReset = () => {
@@ -409,6 +448,7 @@ const BBS_template = () => {
       selectedAnswer: '',
       submitted: false,
       feedback: null,
+      passed: false,
     });
   };
 
@@ -672,15 +712,19 @@ const BBS_template = () => {
                 </>
               ) : (
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" sx={{ mb: 2, color: '#1e3a8a', fontWeight: 700 }}>
-                    Quiz Complete! 🎉
-                  </Typography>
-                  <Typography variant="h6" sx={{ mb: 3, color: '#1f2937' }}>
-                    Your Score: {quizState.score} out of {questions.length}
-                  </Typography>
-                  <Button variant="contained" onClick={handleQuizReset} sx={{ borderRadius: 2 }}>
-                    Retake Quiz
-                  </Button>
+                  {quizState.passed ? (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'success.main' }}> Quiz Passed! 🏆 </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> You've unlocked the next module! </Typography>
+                      <Button variant="contained" size="large" onClick={handleNextStep}> Go to Roadmap </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'error.main' }}> Try Again </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> Your Score: {quizState.score} / {questions.length}. A perfect score is required. </Typography>
+                      <Button variant="contained" onClick={handleQuizReset}> Retake Quiz </Button>
+                    </>
+                  )}
                 </Box>
               )}
             </Paper>
@@ -718,6 +762,7 @@ const BBS_template = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box>
+        {!isUnlocked && <LockOverlay />}
         <Navbar setActivePage={setActivePage} activePage={activePage} />
         <Container
           key={activePage}

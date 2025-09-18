@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useScrollToTop } from 'app/hooks/useScrollToTop';
 import {
   AppBar,
@@ -40,23 +41,43 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SpeedIcon from '@mui/icons-material/Speed';
+import LockIcon from '@mui/icons-material/Lock';
 
-// Assuming these components exist
 import DLS_EX1 from './DLS_EX1';
 import DLS_EX2 from './DLS_EX2';
 import DLSLab from './DLSLab';
 import DLS_Monoco from './DLS_Monoco';
 
-// Debounce function to limit scroll event frequency
-const debounce = (func, wait) => {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(null, args), wait);
-  };
-};
+const LockOverlay = () => (
+  <Box
+    sx={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 1301,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      p: 2
+    }}
+  >
+    <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, boxShadow: 3 }}>
+      <LockIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
+      <Typography variant="h4" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>Module Locked</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        You must first pass the "Depth First Search" quiz to unlock this module.
+      </Typography>
+      <Button component="a" href="/dashboard/roadmap" variant="contained">
+        Back to Roadmap
+      </Button>
+    </Paper>
+  </Box>
+);
 
-// Navbar Component
 const Navbar = ({ setActivePage, activePage }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [hoveredExample, setHoveredExample] = useState(null);
@@ -343,7 +364,8 @@ const theme = createTheme({
 });
 
 const DLS_template = () => {
-  const pages = ['aim', 'theory', 'procedure', 'example1', 'example2', 'simulation', 'Code', 'quiz', 'feedback'];
+  const isUnlocked = localStorage.getItem('dlsUnlocked') === 'true';
+  const navigate = useNavigate();
   const [activePage, setActivePage] = useState('aim');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
@@ -365,6 +387,7 @@ const DLS_template = () => {
     selectedAnswer: '',
     submitted: false,
     feedback: null,
+    passed: false,
   });
 
   const questions = [
@@ -392,6 +415,11 @@ const DLS_template = () => {
     },
   ];
 
+  const handleNextStep = () => {
+    navigate('/dashboard/roadmap');
+
+  };
+
   const handleQuizAnswer = (value) => {
     setQuizState((prev) => ({ ...prev, selectedAnswer: value }));
   };
@@ -412,13 +440,22 @@ const DLS_template = () => {
   };
 
   const handleQuizNext = () => {
-    setQuizState((prev) => ({
-      ...prev,
-      currentQuestion: prev.currentQuestion + 1,
-      selectedAnswer: '',
-      submitted: false,
-      feedback: null,
-    }));
+    const nextQuestionIndex = quizState.currentQuestion + 1;
+    if (nextQuestionIndex < questions.length) {
+      setQuizState((prev) => ({
+        ...prev,
+        currentQuestion: nextQuestionIndex,
+        selectedAnswer: '',
+        submitted: false,
+        feedback: null,
+      }));
+    } else {
+      if (quizState.score === questions.length) {
+        setQuizState(prev => ({ ...prev, passed: true, currentQuestion: nextQuestionIndex }));
+      } else {
+        setQuizState(prev => ({ ...prev, passed: false, currentQuestion: nextQuestionIndex }));
+      }
+    }
   };
 
   const handleQuizReset = () => {
@@ -428,28 +465,9 @@ const DLS_template = () => {
       selectedAnswer: '',
       submitted: false,
       feedback: null,
+      passed: false,
     });
   };
-
-  const handleScroll = useCallback(
-    debounce(() => {
-      const scrollPosition = window.scrollY + window.innerHeight;
-      const pageHeight = document.documentElement.scrollHeight;
-
-      if (scrollPosition >= pageHeight - 100) {
-        const currentIndex = pages.indexOf(activePage);
-        const nextIndex = (currentIndex + 1) % pages.length;
-        setActivePage(pages[nextIndex]);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    }, 300),
-    [activePage]
-  );
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
 
   const renderContent = () => {
     switch (activePage) {
@@ -1021,150 +1039,79 @@ const DLS_template = () => {
                 pl: 2,
               }}
             >
-              Test your knowledge of DLS!
+              Quiz
             </Typography>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                borderRadius: 2,
-                bgcolor: '#f0fdf4',
-                mb: 3,
-                border: '1px solid #bbf7d0',
-              }}
-            >
-
-              <Typography variant="h6" sx={{ color: '#1f2937', mb: 2 }}>
-                Quiz
-              </Typography>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1f2937' }}>
-                  Progress: Question {quizState.currentQuestion + 1}/{questions.length}
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={((quizState.currentQuestion) / questions.length) * 100}
-                  sx={{ mt: 1, height: 8, borderRadius: 4, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: '#3b82f6' } }}
-                />
-                {quizState.currentQuestion === questions.length && (
-                  <Typography variant="h6" sx={{ mt: 2, color: '#1e3a8a', fontWeight: 600 }}>
-                    Final Score: {quizState.score}/{questions.length} (
-                    {((quizState.score / questions.length) * 100).toFixed(0)}%)
-                  </Typography>
-                )}
-              </Box>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
               {quizState.currentQuestion < questions.length ? (
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1f2937', mb: 2 }}>
-                    {quizState.currentQuestion + 1}. {questions[quizState.currentQuestion].question}
+                <>
+                  <LinearProgress
+                    variant="determinate"
+                    value={((quizState.currentQuestion + 1) / questions.length) * 100}
+                    sx={{ mb: 3, height: 8, borderRadius: 4 }}
+                  />
+                  <Typography variant="h6" sx={{ mb: 3, color: '#1e3a8a', fontWeight: 600 }}>
+                    Question {quizState.currentQuestion + 1} of {questions.length}
                   </Typography>
-                  <FormControl component="fieldset" fullWidth>
-                    <RadioGroup
-                      value={quizState.selectedAnswer}
-                      onChange={(e) => handleQuizAnswer(e.target.value)}
-                    >
-                      {questions[quizState.currentQuestion].options.map((option, index) => {
-                        const currentQ = questions[quizState.currentQuestion];
-                        return (
-                          <FormControlLabel
-                            key={index}
-                            value={option}
-                            control={<Radio />}
-                            label={
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                {option}
-                                {quizState.submitted && option === currentQ.correctAnswer && (
-                                  <Box
-                                    sx={{
-                                      ml: 2,
-                                      px: 2,
-                                      py: 0.5,
-                                      borderRadius: 999,
-                                      bgcolor: '#d1fae5',
-                                      color: '#065f46',
-                                      fontSize: '0.875rem',
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Correct
-                                  </Box>
-                                )}
-                                {quizState.submitted && option === quizState.selectedAnswer && option !== currentQ.correctAnswer && (
-                                  <Box
-                                    sx={{
-                                      ml: 2,
-                                      px: 2,
-                                      py: 0.5,
-                                      borderRadius: 999,
-                                      bgcolor: '#fee2e2',
-                                      color: '#b91c1c',
-                                      fontSize: '0.875rem',
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Incorrect
-                                  </Box>
-                                )}
-                              </Box>
-                            }
-                            sx={{
-                              borderRadius: 1,
-                              p: 1,
-                              mb: 1,
-                              '&:hover': { bgcolor: '#f3f4f6' },
-                            }}
-                          />
-                        );
-                      })}
+                  <Typography variant="body1" sx={{ mb: 3, fontSize: '1.1rem', color: '#1f2937' }}>
+                    {questions[quizState.currentQuestion].question}
+                  </Typography>
+                  <FormControl component="fieldset" sx={{ width: '100%', mb: 3 }}>
+                    <RadioGroup value={quizState.selectedAnswer} onChange={(e) => handleQuizAnswer(e.target.value)}>
+                      {questions[quizState.currentQuestion].options.map((option, index) => (
+                        <FormControlLabel
+                          key={index}
+                          value={option}
+                          control={<Radio />}
+                          label={option}
+                          disabled={quizState.submitted}
+                          sx={{
+                            mb: 1, p: 1, borderRadius: 1, border: '1px solid transparent',
+                            '&:hover': { bgcolor: '#f1f5f9' },
+                            ...(quizState.submitted && option === questions[quizState.currentQuestion].correctAnswer && {
+                              bgcolor: '#dcfce7', border: '1px solid #22c55e',
+                            }),
+                            ...(quizState.submitted &&
+                              option === quizState.selectedAnswer &&
+                              option !== questions[quizState.currentQuestion].correctAnswer && {
+                              bgcolor: '#fee2e2', border: '1px solid #ef4444',
+                            }),
+                          }}
+                        />
+                      ))}
                     </RadioGroup>
                   </FormControl>
                   {quizState.feedback && (
-                    <Alert severity={quizState.feedback.severity} sx={{ mt: 2, borderRadius: 2 }}>
+                    <Alert severity={quizState.feedback.severity} sx={{ mb: 3 }}>
                       {quizState.feedback.message}
                     </Alert>
                   )}
-                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleQuizSubmit}
-                      disabled={!quizState.selectedAnswer || quizState.submitted}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Submit
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={handleQuizNext}
-                      disabled={!quizState.submitted || quizState.currentQuestion >= questions.length - 1}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Next
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      onClick={handleQuizReset}
-                      sx={{ borderRadius: 2, ml: 'auto' }}
-                    >
-                      Reset Quiz
-                    </Button>
+                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    {!quizState.submitted ? (
+                      <Button variant="contained" onClick={handleQuizSubmit} disabled={!quizState.selectedAnswer} sx={{ borderRadius: 2 }}>
+                        Submit Answer
+                      </Button>
+                    ) : (
+                      <Button variant="contained" onClick={handleQuizNext} sx={{ borderRadius: 2 }}>
+                        Next Question
+                      </Button>
+                    )}
                   </Box>
-                </Box>
+                </>
               ) : (
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="body1" sx={{ color: '#1f2937', mb: 2 }}>
-                    Quiz completed! Try again to improve your score.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleQuizReset}
-                    startIcon={<QuizIcon />}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Retake Quiz
-                  </Button>
+                  {quizState.passed ? (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'success.main' }}> Quiz Passed! 🏆 </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> Congratulations! You have completed all available levels. </Typography>
+                      <Button variant="contained" size="large" onClick={handleNextStep}> Go to Roadmap </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'error.main' }}> Try Again </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> Your Score: {quizState.score} / {questions.length}. A perfect score is required. </Typography>
+                      <Button variant="contained" onClick={handleQuizReset}> Retake Quiz </Button>
+                    </>
+                  )}
                 </Box>
               )}
             </Paper>
@@ -1229,6 +1176,7 @@ const DLS_template = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box>
+        {!isUnlocked && <LockOverlay />}
         <Navbar setActivePage={setActivePage} activePage={activePage} />
         <Container maxWidth="lg" sx={{ py: 4, willChange: 'transform' }}>
           <Typography

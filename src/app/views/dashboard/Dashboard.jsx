@@ -10,6 +10,7 @@ import {
   CssBaseline,
   Paper,
   Divider,
+  Stack,
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -22,10 +23,12 @@ import DataObjectIcon from '@mui/icons-material/DataObject';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import LayersIcon from '@mui/icons-material/Layers';
 import LinearScaleIcon from '@mui/icons-material/LinearScale';
+import MapIcon from '@mui/icons-material/Map'; // Icon for the roadmap button
 
 // Page Components
 import CanvasAnimation from './CanvasAnimation';
 import ArrayVisualizer from './ArrayVisualizer';
+import Roadmap from './Roadmap'; // Import the new Roadmap component
 
 // --- Theme Definition ---
 const theme = createTheme({
@@ -138,7 +141,13 @@ const VisualizerSelection = ({ onCardClick }) => {
   );
 };
 
-const DashboardContent = ({ onCardClick, handleStartLearningClick, isCardSelectionVisible }) => (
+const DashboardContent = ({
+  onCardClick,
+  handleStartLearningClick,
+  handleRoadmapToggle,
+  isCardSelectionVisible,
+  isRoadmapVisible,
+}) => (
   <motion.div key="dashboard-page" initial="initial" animate="animate" exit="exit" variants={pageVariants}>
     <Box sx={{ background: 'linear-gradient(135deg, #3a5a98 30%, #4b7be5 90%)', color: 'white', py: { xs: 12, md: 16 }, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
       <CanvasAnimation />
@@ -147,9 +156,14 @@ const DashboardContent = ({ onCardClick, handleStartLearningClick, isCardSelecti
           <motion.div variants={itemVariants}><Typography variant="h1" component="h1" gutterBottom>Master Data Structures & Algorithms</Typography></motion.div>
           <motion.div variants={itemVariants}><Typography variant="h5" sx={{ my: 3, opacity: 0.9, fontWeight: 400 }}>The intuitive, interactive, and visual way to understand how algorithms work.</Typography></motion.div>
           <motion.div variants={itemVariants}>
-            <Button variant="contained" size="large" endIcon={<ArrowForwardIcon />} onClick={handleStartLearningClick} sx={{ backgroundColor: 'accent.main', fontSize: '1.1rem', py: 1.5, px: 5, '&:hover': { backgroundColor: '#ff6347', transform: 'scale(1.05)' }}}>
-              Start Learning Now
-            </Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
+              <Button variant="contained" size="large" endIcon={<ArrowForwardIcon />} onClick={handleStartLearningClick} sx={{ backgroundColor: 'accent.main', fontSize: '1.1rem', py: 1.5, px: 5, '&:hover': { backgroundColor: '#ff6347', transform: 'scale(1.05)' } }}>
+                Start Learning Now
+              </Button>
+              <Button variant="outlined" size="large" startIcon={<MapIcon />} onClick={handleRoadmapToggle} sx={{ fontSize: '1.1rem', py: 1.5, px: 5, color: 'white', borderColor: 'rgba(255, 255, 255, 0.7)', '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255, 255, 255, 0.1)', transform: 'scale(1.05)' } }}>
+                View Roadmap
+              </Button>
+            </Stack>
           </motion.div>
         </motion.div>
       </Container>
@@ -163,15 +177,23 @@ const DashboardContent = ({ onCardClick, handleStartLearningClick, isCardSelecti
       )}
     </AnimatePresence>
 
+    <AnimatePresence>
+      {isRoadmapVisible && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.7, ease: 'easeInOut' }} style={{ overflow: 'hidden' }}>
+          <Roadmap />
+        </motion.div>
+      )}
+    </AnimatePresence>
+
     <Divider sx={{ maxWidth: 'lg', mx: 'auto' }} />
 
     <Section>
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={containerVariants}>
         <Typography variant="h2" align="center" sx={{ mb: 8 }}>Why Our Platform?</Typography>
         <Grid container spacing={5} justifyContent="center" alignItems="stretch">
-          <Grid item xs={12} sm={6} md={4}><FeatureCard icon={<PlayCircleOutlineIcon sx={{ fontSize: 50 }} />} title="Interactive Animations" description="Control the flow of execution and see data change in real-time."/></Grid>
-          <Grid item xs={12} sm={6} md={4}><FeatureCard icon={<CodeIcon sx={{ fontSize: 50 }} />} title="Multi-Language Code" description="View synchronized code in Python, C++, and Java."/></Grid>
-          <Grid item xs={12} sm={6} md={4}><FeatureCard icon={<SchoolIcon sx={{ fontSize: 50 }} />} title="Comprehensive Learning" description="Each module comes with a clear Aim, Theory, and Procedure."/></Grid>
+          <Grid item xs={12} sm={6} md={4}><FeatureCard icon={<PlayCircleOutlineIcon sx={{ fontSize: 50 }} />} title="Interactive Animations" description="Control the flow of execution and see data change in real-time." /></Grid>
+          <Grid item xs={12} sm={6} md={4}><FeatureCard icon={<CodeIcon sx={{ fontSize: 50 }} />} title="Multi-Language Code" description="View synchronized code in Python, C++, and Java." /></Grid>
+          <Grid item xs={12} sm={6} md={4}><FeatureCard icon={<SchoolIcon sx={{ fontSize: 50 }} />} title="Comprehensive Learning" description="Each module comes with a clear Aim, Theory, and Procedure." /></Grid>
         </Grid>
       </motion.div>
     </Section>
@@ -194,26 +216,37 @@ const DashboardContent = ({ onCardClick, handleStartLearningClick, isCardSelecti
 const Dashboard = () => {
   const [activeVisualizer, setActiveVisualizer] = useState(null);
   const [isCardSelectionVisible, setCardSelectionVisible] = useState(false);
+  const [isRoadmapVisible, setRoadmapVisible] = useState(false); // State for roadmap visibility
 
   const handleVisualizerSelect = (visualizerId) => {
-    console.log('Visualizer selected:', visualizerId); // Debug log
     setActiveVisualizer(visualizerId);
   };
 
   const handleStartLearningClick = () => {
     setCardSelectionVisible(true);
+    setRoadmapVisible(false); // Hide roadmap if open
     setTimeout(() => {
       document.getElementById('visualizer-selection-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   };
 
+  const handleRoadmapToggle = () => {
+    setRoadmapVisible(true);
+    setCardSelectionVisible(false); // Hide visualizer selection if open
+    setTimeout(() => {
+      const roadmapEl = document.getElementById('roadmap-section');
+      if (roadmapEl) {
+        const top = roadmapEl.getBoundingClientRect().top + window.scrollY - 32; // 32px offset for header
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+    }, 600); // Increased delay for rendering
+  };
+
   const handleNavigation = (visualizerId) => {
-    console.log('Navigation triggered:', visualizerId); // Debug log
     setActiveVisualizer(prev => prev === visualizerId ? null : visualizerId);
   };
 
   const renderActivePage = () => {
-    console.log('Rendering page with activeVisualizer:', activeVisualizer); // Debug log
     if (activeVisualizer) {
       return (
         <ArrayVisualizer
@@ -228,7 +261,9 @@ const Dashboard = () => {
       <DashboardContent
         onCardClick={handleVisualizerSelect}
         handleStartLearningClick={handleStartLearningClick}
+        handleRoadmapToggle={handleRoadmapToggle}
         isCardSelectionVisible={isCardSelectionVisible}
+        isRoadmapVisible={isRoadmapVisible}
       />
     );
   };

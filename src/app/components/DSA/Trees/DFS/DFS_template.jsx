@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useScrollToTop } from 'app/hooks/useScrollToTop';
 import {
   AppBar,
@@ -7,16 +8,10 @@ import {
   Typography,
   Box,
   Paper,
-  List,
-  ListItem,
-  ListItemText,
   Menu,
   MenuItem,
   Container,
-  Divider,
   TextField,
-  Collapse,
-  IconButton,
   Radio,
   RadioGroup,
   FormControlLabel,
@@ -44,43 +39,48 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FeedbackOutlinedIcon from '@mui/icons-material/FeedbackOutlined';
 import QuizIcon from '@mui/icons-material/Quiz';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SpeedIcon from '@mui/icons-material/Speed';
+import LockIcon from '@mui/icons-material/Lock';
 
-// Assuming these components exist
 import DFS_EX1 from './DFS_EX1';
 import DFS_EX2 from './DFS_EX2';
 import DFSLab from './DFSLab';
 import DFS_Monoco from './DFS_Monoco';
 
-// Reusable Section Component (kept for reference, but no longer used in renderContent)
-const Section = ({ title, children }) => (
-  <Paper
-    elevation={3}
+const LockOverlay = () => (
+  <Box
     sx={{
-      maxWidth: '1200px',
-      mx: 'auto',
-      p: { xs: 2, sm: 3, md: 4 },
-      borderRadius: 2,
-      mb: 4,
-      bgcolor: 'white',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-      transition: 'transform 0.2s',
-      '&:hover': { transform: 'translateY(-4px)' },
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 1301,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      p: 2
     }}
   >
-
-    <Box sx={{ color: '#1f2937', lineHeight: 1.6 }}>{children}</Box>
-  </Paper>
+    <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, boxShadow: 3 }}>
+      <LockIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
+      <Typography variant="h4" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>Module Locked</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        You must first pass the "Breadth First Search" quiz to unlock this module.
+      </Typography>
+      <Button component="a" href="/dashboard/roadmap" variant="contained">
+        Back to Roadmap
+      </Button>
+    </Paper>
+  </Box>
 );
 
-// Navbar Component
 const Navbar = ({ setActivePage, activePage }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [hoveredExample, setHoveredExample] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const open = Boolean(anchorEl);
 
   const handleClick = (event) => {
@@ -184,7 +184,6 @@ const Navbar = ({ setActivePage, activePage }) => {
           isActive={activePage === 'procedure'}
         />
 
-        {/* Enhanced Examples Dropdown */}
         <Box sx={{ position: 'relative' }}>
           <Button
             variant="text"
@@ -237,9 +236,6 @@ const Navbar = ({ setActivePage, activePage }) => {
             transformOrigin={{ horizontal: 'center', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
           >
-
-
-            {/* Examples List */}
             {examples.map((example, index) => (
               <MenuItem
                 key={example.id}
@@ -301,8 +297,6 @@ const Navbar = ({ setActivePage, activePage }) => {
                 </Box>
               </MenuItem>
             ))}
-
-
           </Menu>
         </Box>
 
@@ -364,6 +358,8 @@ const theme = createTheme({
 });
 
 const DFS_template = () => {
+  const isUnlocked = localStorage.getItem('dfsUnlocked') === 'true';
+  const navigate = useNavigate();
   const [activePage, setActivePage] = useState('aim');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
@@ -379,13 +375,14 @@ const DFS_template = () => {
   };
 
   useScrollToTop(activePage);
-  const [expanded, setExpanded] = useState({});
+
   const [quizState, setQuizState] = useState({
     currentQuestion: 0,
     score: 0,
     selectedAnswer: '',
     submitted: false,
     feedback: null,
+    passed: false,
   });
 
   useLayoutEffect(() => {
@@ -404,10 +401,24 @@ const DFS_template = () => {
       correctAnswer: 'Child (if it exists)',
       explanation: 'Each node in a tree points to child nodes (if they exist)',
     },
+    {
+      question: 'What data structure is implicitly or explicitly used by Depth-First Search?',
+      options: [
+        'Queue',
+        'Stack',
+        'Heap',
+        'Array',
+      ],
+      correctAnswer: 'Stack',
+      explanation: 'DFS uses a LIFO (Last-In, First-Out) approach, which is naturally implemented with a stack, either explicitly or implicitly through recursion.',
+    }
   ];
 
-  const handleExpand = (section) => {
-    setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
+  const handleNextStep = () => {
+    localStorage.setItem('dlsUnlocked', 'true');
+    localStorage.setItem('expandLevel4', 'true');
+    navigate('/dashboard/roadmap');
+
   };
 
   const handleQuizAnswer = (value) => {
@@ -430,13 +441,22 @@ const DFS_template = () => {
   };
 
   const handleQuizNext = () => {
-    setQuizState((prev) => ({
-      ...prev,
-      currentQuestion: prev.currentQuestion + 1,
-      selectedAnswer: '',
-      submitted: false,
-      feedback: null,
-    }));
+    const nextQuestionIndex = quizState.currentQuestion + 1;
+    if (nextQuestionIndex < questions.length) {
+      setQuizState((prev) => ({
+        ...prev,
+        currentQuestion: nextQuestionIndex,
+        selectedAnswer: '',
+        submitted: false,
+        feedback: null,
+      }));
+    } else {
+      if (quizState.score === questions.length) {
+        setQuizState(prev => ({ ...prev, passed: true, currentQuestion: nextQuestionIndex }));
+      } else {
+        setQuizState(prev => ({ ...prev, passed: false, currentQuestion: nextQuestionIndex }));
+      }
+    }
   };
 
   const handleQuizReset = () => {
@@ -446,6 +466,7 @@ const DFS_template = () => {
       selectedAnswer: '',
       submitted: false,
       feedback: null,
+      passed: false,
     });
   };
 
@@ -615,9 +636,6 @@ const DFS_template = () => {
               <Typography variant="body1" sx={{ color: '#1f2937', mb: 2 }}>
                 <strong>Depth-First Search (DFS)</strong> s a tree traversal algorithm that explores as far as possible along each branch before backtracking. It starts from the root node and dives deep into the tree along a single branch before visiting sibling nodes.
               </Typography>
-
-
-
             </Paper>
             <Paper
               elevation={0}
@@ -638,9 +656,6 @@ const DFS_template = () => {
               <Typography variant="body1" sx={{ color: '#1f2937', mb: 2 }}>
                 DFS uses a <b>stack</b> data structure (either explicitly or via recursion). It follows the path from the root to the deepest node before backtracking and continuing with other unexplored paths.
               </Typography>
-
-
-
             </Paper>
 
             <Paper
@@ -693,7 +708,6 @@ const DFS_template = () => {
                     D → E → B → F → C → A
                   </Typography>
                 </Paper>
-
               </Box>
               <Typography variant="body2" sx={{ color: '#1f2937' }}>
                 In a binary tree, DFS generally follows the <b>Preorder → Inorder → Postorder</b>
@@ -739,9 +753,7 @@ const DFS_template = () => {
                     Not guaranteed to find the shortest path in weighted or unbalanced trees.
                   </Typography>
                 </Paper>
-
               </Box>
-
             </Paper>
 
             <Paper
@@ -1153,153 +1165,79 @@ const DFS_template = () => {
                 pl: 2,
               }}
             >
-              Test your knowledge of trees!
+              Quiz
             </Typography>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                borderRadius: 2,
-                bgcolor: '#f0fdf4',
-                mb: 3,
-                border: '1px solid #bbf7d0',
-              }}
-            >
-
-              <Typography variant="body2" sx={{ color: '#1f2937', mb: 4 }}>
-                Mark as complete Save for later
-              </Typography>
-              <Typography variant="h6" sx={{ color: '#1f2937', mb: 2 }}>
-                Quiz
-              </Typography>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1f2937' }}>
-                  Progress: Question {quizState.currentQuestion + 1}/{questions.length}
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={(quizState.currentQuestion / questions.length) * 100}
-                  sx={{ mt: 1, height: 8, borderRadius: 4, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: '#3b82f6' } }}
-                />
-                {quizState.currentQuestion === questions.length && (
-                  <Typography variant="h6" sx={{ mt: 2, color: '#1e3a8a', fontWeight: 600 }}>
-                    Final Score: {quizState.score}/{questions.length} (
-                    {((quizState.score / questions.length) * 100).toFixed(0)}%)
-                  </Typography>
-                )}
-              </Box>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
               {quizState.currentQuestion < questions.length ? (
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1f2937', mb: 2 }}>
-                    1. {questions[quizState.currentQuestion].question}
+                <>
+                  <LinearProgress
+                    variant="determinate"
+                    value={((quizState.currentQuestion + 1) / questions.length) * 100}
+                    sx={{ mb: 3, height: 8, borderRadius: 4 }}
+                  />
+                  <Typography variant="h6" sx={{ mb: 3, color: '#1e3a8a', fontWeight: 600 }}>
+                    Question {quizState.currentQuestion + 1} of {questions.length}
                   </Typography>
-                  <FormControl component="fieldset" fullWidth>
-                    <RadioGroup
-                      value={quizState.selectedAnswer}
-                      onChange={(e) => handleQuizAnswer(e.target.value)}
-                    >
-                      {questions[quizState.currentQuestion].options.map((option, index) => {
-                        const currentQ = questions[quizState.currentQuestion];
-                        return (
-                          <FormControlLabel
-                            key={index}
-                            value={option}
-                            control={<Radio />}
-                            label={
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                {option}
-                                {quizState.submitted && option === currentQ.correctAnswer && (
-                                  <Box
-                                    sx={{
-                                      ml: 2,
-                                      px: 2,
-                                      py: 0.5,
-                                      borderRadius: 999,
-                                      bgcolor: '#d1fae5',
-                                      color: '#065f46',
-                                      fontSize: '0.875rem',
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Correct
-                                  </Box>
-                                )}
-                                {quizState.submitted && option === quizState.selectedAnswer && option !== currentQ.correctAnswer && (
-                                  <Box
-                                    sx={{
-                                      ml: 2,
-                                      px: 2,
-                                      py: 0.5,
-                                      borderRadius: 999,
-                                      bgcolor: '#fee2e2',
-                                      color: '#b91c1c',
-                                      fontSize: '0.875rem',
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    Incorrect
-                                  </Box>
-                                )}
-                              </Box>
-                            }
-                            sx={{
-                              borderRadius: 1,
-                              p: 1,
-                              mb: 1,
-                              '&:hover': { bgcolor: '#f3f4f6' },
-                            }}
-                          />
-                        );
-                      })}
+                  <Typography variant="body1" sx={{ mb: 3, fontSize: '1.1rem', color: '#1f2937' }}>
+                    {questions[quizState.currentQuestion].question}
+                  </Typography>
+                  <FormControl component="fieldset" sx={{ width: '100%', mb: 3 }}>
+                    <RadioGroup value={quizState.selectedAnswer} onChange={(e) => handleQuizAnswer(e.target.value)}>
+                      {questions[quizState.currentQuestion].options.map((option, index) => (
+                        <FormControlLabel
+                          key={index}
+                          value={option}
+                          control={<Radio />}
+                          label={option}
+                          disabled={quizState.submitted}
+                          sx={{
+                            mb: 1, p: 1, borderRadius: 1, border: '1px solid transparent',
+                            '&:hover': { bgcolor: '#f1f5f9' },
+                            ...(quizState.submitted && option === questions[quizState.currentQuestion].correctAnswer && {
+                              bgcolor: '#dcfce7', border: '1px solid #22c55e',
+                            }),
+                            ...(quizState.submitted &&
+                              option === quizState.selectedAnswer &&
+                              option !== questions[quizState.currentQuestion].correctAnswer && {
+                              bgcolor: '#fee2e2', border: '1px solid #ef4444',
+                            }),
+                          }}
+                        />
+                      ))}
                     </RadioGroup>
                   </FormControl>
                   {quizState.feedback && (
-                    <Alert severity={quizState.feedback.severity} sx={{ mt: 2, borderRadius: 2 }}>
+                    <Alert severity={quizState.feedback.severity} sx={{ mb: 3 }}>
                       {quizState.feedback.message}
                     </Alert>
                   )}
-                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleQuizSubmit}
-                      disabled={!quizState.selectedAnswer || quizState.submitted}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Submit
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={handleQuizNext}
-                      disabled={!quizState.submitted}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Next
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      onClick={handleQuizReset}
-                      sx={{ borderRadius: 2, ml: 'auto' }}
-                    >
-                      Reset Quiz
-                    </Button>
+                  <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    {!quizState.submitted ? (
+                      <Button variant="contained" onClick={handleQuizSubmit} disabled={!quizState.selectedAnswer} sx={{ borderRadius: 2 }}>
+                        Submit Answer
+                      </Button>
+                    ) : (
+                      <Button variant="contained" onClick={handleQuizNext} sx={{ borderRadius: 2 }}>
+                        Next Question
+                      </Button>
+                    )}
                   </Box>
-                </Box>
+                </>
               ) : (
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="body1" sx={{ color: '#1f2937', mb: 2 }}>
-                    Quiz completed! Try again to improve your score.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleQuizReset}
-                    startIcon={<QuizIcon />}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Retake Quiz
-                  </Button>
+                  {quizState.passed ? (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'success.main' }}> Quiz Passed! 🏆 </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> You've unlocked the next module! </Typography>
+                      <Button variant="contained" size="large" onClick={handleNextStep}> Go to Roadmap </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'error.main' }}> Try Again </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> Your Score: {quizState.score} / {questions.length}. A perfect score is required. </Typography>
+                      <Button variant="contained" onClick={handleQuizReset}> Retake Quiz </Button>
+                    </>
+                  )}
                 </Box>
               )}
             </Paper>
@@ -1314,9 +1252,9 @@ const DFS_template = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box>
+        {!isUnlocked && <LockOverlay />}
         <Navbar setActivePage={setActivePage} activePage={activePage} />
         <Container maxWidth="lg" sx={{ py: 4, willChange: 'transform' }}>
-          {/* This ref is no longer needed with the window.scrollTo fix */}
           <Typography
             variant="h5"
             component="h1"

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -19,7 +20,7 @@ import {
   createTheme,
   ThemeProvider,
   CssBaseline,
-  Snackbar, // MODIFIED: Added Snackbar import
+  Snackbar,
 } from '@mui/material';
 import {
   Timeline,
@@ -40,12 +41,43 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SpeedIcon from '@mui/icons-material/Speed';
 import RuleIcon from '@mui/icons-material/Rule';
+import LockIcon from '@mui/icons-material/Lock';
 
 import VP_EX1 from './VP_EX1';
 import VP_EX2 from './VP_EX2';
 import VPLab from './VPLab';
 import VP_Monoco from './VP_Monoco';
 import { useScrollToTop } from 'app/hooks/useScrollToTop';
+
+const LockOverlay = () => (
+  <Box
+    sx={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 1301,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      p: 2
+    }}
+  >
+    <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, boxShadow: 3 }}>
+      <LockIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
+      <Typography variant="h4" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>Module Locked</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        You must first pass the "Infix → Postfix Conversion" quiz to unlock this module.
+      </Typography>
+      <Button component="a" href="/dashboard/roadmap" variant="contained">
+        Back to Roadmap
+      </Button>
+    </Paper>
+  </Box>
+);
 
 const Navbar = ({ setActivePage, activePage }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -268,8 +300,6 @@ const Navbar = ({ setActivePage, activePage }) => {
                 </Box>
               </MenuItem>
             ))}
-
-
           </Menu>
         </Box>
 
@@ -331,11 +361,12 @@ const theme = createTheme({
 });
 
 const VP_template = () => {
+  const isUnlocked = localStorage.getItem('validParenthesisUnlocked') === 'true';
+  const navigate = useNavigate();
   const [activePage, setActivePage] = useState('aim');
 
   useScrollToTop(activePage);
 
-  // --- MODIFICATION START ---
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   const showSnackbar = useCallback((message, severity = 'info') => {
@@ -348,7 +379,6 @@ const VP_template = () => {
     }
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
-  // --- MODIFICATION END ---
 
   const [quizState, setQuizState] = useState({
     currentQuestion: 0,
@@ -356,6 +386,7 @@ const VP_template = () => {
     selectedAnswer: '',
     submitted: false,
     feedback: null,
+    passed: false,
   });
 
   const questions = [
@@ -383,6 +414,11 @@ const VP_template = () => {
     },
   ];
 
+  const handleNextStep = () => {
+    localStorage.setItem('level3Unlocked', 'true');
+    navigate('/dashboard/roadmap');
+  };
+
   const handleQuizAnswer = (value) => {
     setQuizState((prev) => ({ ...prev, selectedAnswer: value }));
   };
@@ -403,13 +439,22 @@ const VP_template = () => {
   };
 
   const handleQuizNext = () => {
-    setQuizState((prev) => ({
-      ...prev,
-      currentQuestion: prev.currentQuestion + 1,
-      selectedAnswer: '',
-      submitted: false,
-      feedback: null,
-    }));
+    const nextQuestionIndex = quizState.currentQuestion + 1;
+    if (nextQuestionIndex < questions.length) {
+      setQuizState((prev) => ({
+        ...prev,
+        currentQuestion: nextQuestionIndex,
+        selectedAnswer: '',
+        submitted: false,
+        feedback: null,
+      }));
+    } else {
+      if (quizState.score === questions.length) {
+        setQuizState(prev => ({ ...prev, passed: true, currentQuestion: nextQuestionIndex }));
+      } else {
+        setQuizState(prev => ({ ...prev, passed: false, currentQuestion: nextQuestionIndex }));
+      }
+    }
   };
 
   const handleQuizReset = () => {
@@ -419,6 +464,7 @@ const VP_template = () => {
       selectedAnswer: '',
       submitted: false,
       feedback: null,
+      passed: false,
     });
   };
 
@@ -674,14 +720,12 @@ const VP_template = () => {
             </Paper>
           </>
         );
-      // --- MODIFICATION START ---
       case 'example1':
         return <VP_EX1 showSnackbar={showSnackbar} />;
       case 'example2':
         return <VP_EX2 showSnackbar={showSnackbar} />;
       case 'simulation':
         return <VPLab showSnackbar={showSnackbar} />;
-      // --- MODIFICATION END ---
       case 'Code':
         return <VP_Monoco showSnackbar={showSnackbar} />;
       case 'quiz':
@@ -775,15 +819,19 @@ const VP_template = () => {
                 </>
               ) : (
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" sx={{ mb: 2, color: '#1e3a8a', fontWeight: 700 }}>
-                    Quiz Complete! 🎉
-                  </Typography>
-                  <Typography variant="h6" sx={{ mb: 3, color: '#1f2937' }}>
-                    Your Score: {quizState.score} out of {questions.length}
-                  </Typography>
-                  <Button variant="contained" onClick={handleQuizReset} sx={{ borderRadius: 2 }}>
-                    Retake Quiz
-                  </Button>
+                  {quizState.passed ? (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'success.main' }}> Quiz Passed! 🏆 </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> You've completed Level 2 and unlocked the next level! </Typography>
+                      <Button variant="contained" size="large" onClick={handleNextStep}> Go to Roadmap </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'error.main' }}> Try Again </Typography>
+                      <Typography variant="h6" sx={{ mb: 3 }}> Your Score: {quizState.score} / {questions.length}. A perfect score is required. </Typography>
+                      <Button variant="contained" onClick={handleQuizReset}> Retake Quiz </Button>
+                    </>
+                  )}
                 </Box>
               )}
             </Paper>
@@ -843,6 +891,7 @@ const VP_template = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box>
+        {!isUnlocked && <LockOverlay />}
         <Navbar setActivePage={setActivePage} activePage={activePage} />
         <Container
           key={activePage}
@@ -869,8 +918,6 @@ const VP_template = () => {
           </Typography>
           {renderContent()}
         </Container>
-
-        {/* --- MODIFICATION: The Snackbar is rendered here, as a SIBLING to the Container --- */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3000}

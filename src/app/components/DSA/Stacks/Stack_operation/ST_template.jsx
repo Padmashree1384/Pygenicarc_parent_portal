@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -135,6 +136,7 @@ const theme = createTheme({
 });
 
 const ST_template = () => {
+  const navigate = useNavigate();
   const [activePage, setActivePage] = useState('aim');
 
   useScrollToTop(activePage);
@@ -161,6 +163,7 @@ const ST_template = () => {
     selectedAnswer: '',
     submitted: false,
     feedback: null,
+    passed: false,
   });
 
   const questions = [
@@ -198,13 +201,23 @@ const ST_template = () => {
   };
 
   const handleQuizNext = () => {
-    setQuizState((prev) => ({
-      ...prev,
-      currentQuestion: prev.currentQuestion + 1,
-      selectedAnswer: '',
-      submitted: false,
-      feedback: null,
-    }));
+    const nextQuestionIndex = quizState.currentQuestion + 1;
+    if (nextQuestionIndex < questions.length) {
+      setQuizState((prev) => ({
+        ...prev,
+        currentQuestion: nextQuestionIndex,
+        selectedAnswer: '',
+        submitted: false,
+        feedback: null,
+      }));
+    } else {
+      // Quiz is finished, check for pass condition (perfect score)
+      if (quizState.score === questions.length) {
+        setQuizState(prev => ({ ...prev, passed: true, currentQuestion: nextQuestionIndex }));
+      } else {
+        setQuizState(prev => ({ ...prev, passed: false, currentQuestion: nextQuestionIndex }));
+      }
+    }
   };
 
   const handleQuizReset = () => {
@@ -214,8 +227,21 @@ const ST_template = () => {
       selectedAnswer: '',
       submitted: false,
       feedback: null,
+      passed: false,
+
     });
   };
+
+  const handleNextStep = () => {
+    // 1. Set the unlock flag for the roadmap to read
+    localStorage.setItem('queueUnlocked', 'true');
+    // 2. Set the one-time animation trigger
+    localStorage.setItem('playUnlockAnimation', 'true');
+    // 3. Navigate back to the roadmap
+    navigate('/dashboard/Roadmap'); // Adjust if your roadmap URL is different
+  };
+
+  const isQuizFinished = quizState.currentQuestion >= questions.length;
 
   const renderContent = () => {
     switch (activePage) {
@@ -431,7 +457,7 @@ const ST_template = () => {
               Quiz
             </Typography>
             <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-              {quizState.currentQuestion < questions.length ? (
+              {!isQuizFinished ? (
                 <>
                   <LinearProgress variant="determinate" value={((quizState.currentQuestion + 1) / questions.length) * 100} sx={{ mb: 3, height: 8, borderRadius: 4 }} />
                   <Typography variant="h6" sx={{ mb: 3, color: '#1e3a8a', fontWeight: 600 }}>
@@ -443,32 +469,10 @@ const ST_template = () => {
                   <FormControl component="fieldset" sx={{ width: '100%', mb: 3 }}>
                     <RadioGroup value={quizState.selectedAnswer} onChange={(e) => handleQuizAnswer(e.target.value)}>
                       {questions[quizState.currentQuestion].options.map((option, index) => {
-                        const currentQ = questions[quizState.currentQuestion];
                         return (
                           <FormControlLabel
-                            key={index}
-                            value={option}
-                            control={<Radio />}
-                            label={option}
-                            disabled={quizState.submitted}
-                            sx={{
-                              mb: 1,
-                              p: 1,
-                              borderRadius: 1,
-                              border: '1px solid transparent',
-                              '&:hover': { bgcolor: '#f1f5f9' },
-                              ...(quizState.submitted &&
-                                option === currentQ.correctAnswer && {
-                                bgcolor: '#dcfce7',
-                                border: '1px solid #22c55e',
-                              }),
-                              ...(quizState.submitted &&
-                                option === quizState.selectedAnswer &&
-                                option !== currentQ.correctAnswer && {
-                                bgcolor: '#fee2e2',
-                                border: '1px solid #ef4444',
-                              }),
-                            }}
+                            key={index} value={option} control={<Radio />} label={option} disabled={quizState.submitted}
+                            sx={{ mb: 1, p: 1, borderRadius: 1, border: '1px solid transparent' }}
                           />
                         );
                       })}
@@ -493,15 +497,31 @@ const ST_template = () => {
                 </>
               ) : (
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" sx={{ mb: 2, color: '#1e3a8a', fontWeight: 700 }}>
-                    Quiz Complete! 🎉
-                  </Typography>
-                  <Typography variant="h6" sx={{ mb: 3, color: '#1f2937' }}>
-                    Your Score: {quizState.score} out of {questions.length}
-                  </Typography>
-                  <Button variant="contained" onClick={handleQuizReset} sx={{ borderRadius: 2 }}>
-                    Retake Quiz
-                  </Button>
+                  {quizState.passed ? (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'success.main', fontWeight: 700 }}>
+                        Quiz Passed! 🏆
+                      </Typography>
+                      <Typography variant="h6" sx={{ mb: 3, color: 'text.secondary' }}>
+                        You've unlocked the next module.
+                      </Typography>
+                      <Button variant="contained" size="large" onClick={handleNextStep}>
+                        Go to Roadmap
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="h4" sx={{ mb: 2, color: 'error.main', fontWeight: 700 }}>
+                        Try Again
+                      </Typography>
+                      <Typography variant="h6" sx={{ mb: 3, color: 'text.secondary' }}>
+                        Your Score: {quizState.score} out of {questions.length}. A perfect score is required.
+                      </Typography>
+                      <Button variant="contained" onClick={handleQuizReset} sx={{ borderRadius: 2 }}>
+                        Retake Quiz
+                      </Button>
+                    </>
+                  )}
                 </Box>
               )}
             </Paper>

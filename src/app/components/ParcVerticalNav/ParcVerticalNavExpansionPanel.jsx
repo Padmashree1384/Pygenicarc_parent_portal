@@ -83,6 +83,16 @@ export default function ParcVerticalNavExpansionPanel({ item, children, mode }) 
   const componentHeight = useRef(0);
   const { pathname } = useLocation();
   const { name, icon, iconText, badge } = item;
+  // Auto-close submenu when navigating to a new page
+  useEffect(() => {
+    setCollapsed(true);
+  }, [pathname]);
+  // Auto-close submenu when sidebar is collapsed
+  useEffect(() => {
+    if (mode === "compact" || mode === "close") {
+      setCollapsed(true);
+    }
+  }, [mode]);
 
   const handleClick = () => {
     componentHeight.current = 0;

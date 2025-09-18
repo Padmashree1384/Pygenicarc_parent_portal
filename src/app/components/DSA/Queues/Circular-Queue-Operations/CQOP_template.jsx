@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import LockIcon from '@mui/icons-material/Lock';
 import {
   AppBar,
   Toolbar,
@@ -43,6 +45,35 @@ import CQOP from './CQOP';
 import CQOP_Monoco from './CQOP_Monoco';
 import { useScrollToTop } from 'app/hooks/useScrollToTop';
 
+const LockOverlay = () => (
+  <Box
+    sx={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 1301, // Set high z-index to be on top of everything
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      p: 2
+    }}
+  >
+    <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, boxShadow: 3 }}>
+      <LockIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
+      <Typography variant="h4" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>Module Locked</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        You must first pass the "Queue Operations" quiz to unlock this module.
+      </Typography>
+      <Button component="a" href="/dashboard/roadmap" variant="contained">
+        Back to Roadmap
+      </Button>
+    </Paper>
+  </Box>
+);
 // Navbar Component
 const Navbar = ({ setActivePage, activePage }) => {
   const NavButton = ({ icon, label, page, isActive = false }) => (
@@ -93,6 +124,8 @@ const theme = createTheme({
 });
 
 const CQOP_template = () => {
+  const navigate = useNavigate();
+  const isUnlocked = localStorage.getItem('circularQueueUnlocked') === 'true';
   const [activePage, setActivePage] = useState('aim');
   useScrollToTop(activePage);
 
@@ -109,7 +142,7 @@ const CQOP_template = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  const [quizState, setQuizState] = useState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null });
+  const [quizState, setQuizState] = useState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null, passed: false });
   const questions = [
     {
       question: 'What is the primary advantage of a circular queue over a standard linear queue?',
@@ -125,14 +158,31 @@ const CQOP_template = () => {
     },
   ];
 
+  const handleNextStep = () => {
+    localStorage.setItem('infixPostfixUnlocked', 'true');
+    localStorage.setItem('expandLevel2', 'true'); // This tells the roadmap to open Level 2
+    navigate('/dashboard/roadmap');
+  };
+
   const handleQuizAnswer = (value) => setQuizState((prev) => ({ ...prev, selectedAnswer: value }));
   const handleQuizSubmit = () => {
     const currentQ = questions[quizState.currentQuestion];
     const isCorrect = quizState.selectedAnswer === currentQ.correctAnswer;
     setQuizState((prev) => ({ ...prev, submitted: true, feedback: { isCorrect, message: currentQ.explanation, severity: isCorrect ? 'success' : 'error' }, score: isCorrect ? prev.score + 1 : prev.score }));
   };
-  const handleQuizNext = () => setQuizState((prev) => ({ ...prev, currentQuestion: prev.currentQuestion + 1, selectedAnswer: '', submitted: false, feedback: null }));
-  const handleQuizReset = () => setQuizState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null });
+  const handleQuizNext = () => {
+    const nextQuestionIndex = quizState.currentQuestion + 1;
+    if (nextQuestionIndex < questions.length) {
+      setQuizState((prev) => ({ ...prev, currentQuestion: nextQuestionIndex, selectedAnswer: '', submitted: false, feedback: null, }));
+    } else {
+      if (quizState.score === questions.length) {
+        setQuizState(prev => ({ ...prev, passed: true, currentQuestion: nextQuestionIndex }));
+      } else {
+        setQuizState(prev => ({ ...prev, passed: false, currentQuestion: nextQuestionIndex }));
+      }
+    }
+  };
+  const handleQuizReset = () => setQuizState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null, passed: false });
 
   const renderContent = () => {
     switch (activePage) {
@@ -223,9 +273,19 @@ const CQOP_template = () => {
               </>
             ) : (
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ mb: 2 }}>Quiz Complete!</Typography>
-                <Typography variant="h6" sx={{ mb: 3 }}>Your Score: {quizState.score} / {questions.length}</Typography>
-                <Button variant="contained" onClick={handleQuizReset}>Retake Quiz</Button>
+                {quizState.passed ? (
+                  <>
+                    <Typography variant="h4" sx={{ mb: 2, color: 'success.main' }}> Quiz Passed! 🏆 </Typography>
+                    <Typography variant="h6" sx={{ mb: 3 }}> You've unlocked the next module. </Typography>
+                    <Button variant="contained" size="large" onClick={handleNextStep}> Go to Roadmap </Button>
+                  </>
+                ) : (
+                  <>
+                    <Typography variant="h4" sx={{ mb: 2, color: 'error.main' }}> Try Again </Typography>
+                    <Typography variant="h6" sx={{ mb: 3 }}> Your Score: {quizState.score} / {questions.length}. A perfect score is required. </Typography>
+                    <Button variant="contained" onClick={handleQuizReset}> Retake Quiz </Button>
+                  </>
+                )}
               </Box>
             )}
           </Paper>
@@ -249,6 +309,7 @@ const CQOP_template = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box>
+        {!isUnlocked && <LockOverlay />}
         <Navbar setActivePage={setActivePage} activePage={activePage} />
         <Container key={activePage} maxWidth="lg" sx={{ py: 4, willChange: 'transform', scrollBehavior: 'auto', position: 'relative', top: 0 }}>
           <Typography variant="h5" component="h1" sx={{ fontWeight: 700, color: '#1e3a8a', mb: 4, textAlign: 'center' }}>

@@ -43,7 +43,7 @@ export default function Footer() {
         <AppFooter>
           <FooterContent>
             <Span m="auto" />
-            <Paragraph m={0}>Design and Developed by PyGenicArc</Paragraph>
+            <Paragraph m={0}>Designed and Developed by PyGenicArc</Paragraph>
           </FooterContent>
         </AppFooter>
       </AppBar>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -17,7 +18,7 @@ import {
   createTheme,
   ThemeProvider,
   CssBaseline,
-  Snackbar, // Added for centralized snackbar
+  Snackbar,
 } from '@mui/material';
 import {
   Timeline,
@@ -37,36 +38,51 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SpeedIcon from '@mui/icons-material/Speed';
 import GroupWorkIcon from '@mui/icons-material/GroupWork';
+import LockIcon from '@mui/icons-material/Lock';
 
-// Assuming these components exist and are adapted for Queues
-import QOP from './QOP';
-import QOP_Monoco from './QOP_Monoco';
-import { useScrollToTop } from 'app/hooks/useScrollToTop';
+// Assuming these components exist. Replace with placeholders if needed.
+// import QOP from './QOP';
+// import QOP_Monoco from './QOP_Monoco';
+// import { useScrollToTop } from 'app/hooks/useScrollToTop';
+const useScrollToTop = () => { }; // Mock hook
 
-// Navbar Component
+const LockOverlay = () => (
+  <Box
+    sx={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 1301, // Set high z-index to be on top of everything
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      p: 2
+    }}
+  >
+    <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, boxShadow: 3 }}>
+      <LockIcon sx={{ fontSize: 60, color: 'text.secondary' }} />
+      <Typography variant="h4" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>Module Locked</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        You must first pass the "Stack Operations" quiz to unlock this module.
+      </Typography>
+      <Button component="a" href="/dashboard/roadmap" variant="contained">
+        Back to Roadmap
+      </Button>
+    </Paper>
+  </Box>
+);
+
 const Navbar = ({ setActivePage, activePage }) => {
   const NavButton = ({ icon, label, page, isActive = false }) => (
     <Button
       variant="text"
       onClick={() => setActivePage(page)}
       startIcon={icon}
-      sx={{
-        color: isActive ? '#ffffff' : '#e2e8f0',
-        borderRadius: 2,
-        px: { xs: 0.8, sm: 1.5, md: 2 },
-        py: { xs: 0.5, sm: 1 },
-        textTransform: 'none',
-        fontWeight: 600,
-        fontSize: { xs: '0.75rem', sm: '0.9rem', md: '1rem' },
-        minWidth: 'auto',
-        transition: 'background-color 0.3s ease, color 0.3s ease, transform 0.3s ease',
-        background: isActive ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-        '&:hover': {
-          bgcolor: isActive ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.1)',
-          color: '#ffffff',
-          transform: 'translateY(-2px)',
-        },
-      }}
+      sx={{ color: isActive ? '#ffffff' : '#e2e8f0', borderRadius: 2, px: { xs: 0.8, sm: 1.5, md: 2 }, py: { xs: 0.5, sm: 1 }, textTransform: 'none', fontWeight: 600, fontSize: { xs: '0.75rem', sm: '0.9rem', md: '1rem' }, minWidth: 'auto', transition: 'background-color 0.3s ease, color 0.3s ease, transform 0.3s ease', background: isActive ? 'rgba(59, 130, 246, 0.2)' : 'transparent', '&:hover': { bgcolor: isActive ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.1)', color: '#ffffff', transform: 'translateY(-2px)' } }}
     >
       {label}
     </Button>
@@ -93,24 +109,17 @@ const theme = createTheme({
 });
 
 const QOP_template = () => {
+  const navigate = useNavigate();
+  const isUnlocked = localStorage.getItem('queueUnlocked') === 'true';
+
   const [activePage, setActivePage] = useState('aim');
   useScrollToTop(activePage);
 
-  // Snackbar state and handlers are now managed here
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const showSnackbar = useCallback((message, severity = 'info') => { setSnackbar({ open: true, message, severity }); }, []);
+  const handleCloseSnackbar = (event, reason) => { if (reason === 'clickaway') { return; } setSnackbar((prev) => ({ ...prev, open: false })); };
 
-  const showSnackbar = useCallback((message, severity = 'info') => {
-    setSnackbar({ open: true, message, severity });
-  }, []);
-
-  const handleCloseSnackbar = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  };
-
-  const [quizState, setQuizState] = useState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null });
+  const [quizState, setQuizState] = useState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null, passed: false });
   const questions = [
     {
       question: 'What does FIFO stand for in the context of a queue?',
@@ -125,18 +134,34 @@ const QOP_template = () => {
       explanation: 'The "Dequeue" operation removes an element from the front (or head) of the queue.',
     },
   ];
-
-  // Quiz handlers
+  const handleNextStep = () => {
+    localStorage.setItem('circularQueueUnlocked', 'true');
+    localStorage.setItem('playCQUnlockAnimation', 'true');
+    navigate('/dashboard/roadmap');
+  };
   const handleQuizAnswer = (value) => setQuizState((prev) => ({ ...prev, selectedAnswer: value }));
   const handleQuizSubmit = () => {
     const currentQ = questions[quizState.currentQuestion];
     const isCorrect = quizState.selectedAnswer === currentQ.correctAnswer;
     setQuizState((prev) => ({ ...prev, submitted: true, feedback: { isCorrect, message: currentQ.explanation, severity: isCorrect ? 'success' : 'error' }, score: isCorrect ? prev.score + 1 : prev.score }));
   };
-  const handleQuizNext = () => setQuizState((prev) => ({ ...prev, currentQuestion: prev.currentQuestion + 1, selectedAnswer: '', submitted: false, feedback: null }));
-  const handleQuizReset = () => setQuizState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null });
+  const handleQuizNext = () => {
+    const nextQuestionIndex = quizState.currentQuestion + 1;
+    if (nextQuestionIndex < questions.length) {
+      setQuizState((prev) => ({ ...prev, currentQuestion: nextQuestionIndex, selectedAnswer: '', submitted: false, feedback: null, }));
+    } else {
+      if (quizState.score === questions.length) {
+        setQuizState(prev => ({ ...prev, passed: true, currentQuestion: nextQuestionIndex }));
+      } else {
+        setQuizState(prev => ({ ...prev, passed: false, currentQuestion: nextQuestionIndex }));
+      }
+    }
+  };
+
+  const handleQuizReset = () => setQuizState({ currentQuestion: 0, score: 0, selectedAnswer: '', submitted: false, feedback: null, passed: false });
 
   const renderContent = () => {
+    const isQuizFinished = quizState.currentQuestion >= questions.length;
     switch (activePage) {
       case 'aim':
         return (
@@ -206,8 +231,8 @@ const QOP_template = () => {
             </Box>
           </Paper>
         );
-      case 'simulation': return <QOP showSnackbar={showSnackbar} />;
-      case 'Code': return <QOP_Monoco showSnackbar={showSnackbar} />;
+      case 'simulation': return <Paper sx={{ p: 3 }}><Typography>Simulation (QOP) component goes here.</Typography></Paper>;
+      case 'Code': return <Paper sx={{ p: 3 }}><Typography>Code (QOP_Monoco) component goes here.</Typography></Paper>;
       case 'quiz':
         return (
           <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f8fafc' }}>
@@ -230,9 +255,19 @@ const QOP_template = () => {
               </>
             ) : (
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ mb: 2 }}>Quiz Complete!</Typography>
-                <Typography variant="h6" sx={{ mb: 3 }}>Your Score: {quizState.score} / {questions.length}</Typography>
-                <Button variant="contained" onClick={handleQuizReset}>Retake Quiz</Button>
+                {quizState.passed ? (
+                  <>
+                    <Typography variant="h4" sx={{ mb: 2, color: 'success.main' }}> Quiz Passed! 🏆 </Typography>
+                    <Typography variant="h6" sx={{ mb: 3 }}> You've unlocked the next module. </Typography>
+                    <Button variant="contained" size="large" onClick={handleNextStep}> Go to Roadmap </Button>
+                  </>
+                ) : (
+                  <>
+                    <Typography variant="h4" sx={{ mb: 2, color: 'error.main' }}> Try Again </Typography>
+                    <Typography variant="h6" sx={{ mb: 3 }}> Your Score: {quizState.score} / {questions.length}. A perfect score is required. </Typography>
+                    <Button variant="contained" onClick={handleQuizReset}> Retake Quiz </Button>
+                  </>
+                )}
               </Box>
             )}
           </Paper>
@@ -256,6 +291,8 @@ const QOP_template = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box>
+        {!isUnlocked && <LockOverlay />}
+
         <Navbar setActivePage={setActivePage} activePage={activePage} />
         <Container key={activePage} maxWidth="lg" sx={{ py: 4, willChange: 'transform', scrollBehavior: 'auto', position: 'relative', top: 0 }}>
           <Typography variant="h5" component="h1" sx={{ fontWeight: 700, color: '#1e3a8a', mb: 4, textAlign: 'center' }}>

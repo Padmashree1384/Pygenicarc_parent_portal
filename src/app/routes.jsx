@@ -6,7 +6,7 @@ import ParcLayout from "./components/ParcLayout/ParcLayout";
 import Dashboard from "./views/dashboard/Dashboard";
 
 // NEW: Import the main visualizer hub component
-
+import Roadmap from "./views/dashboard/Roadmap";
 
 import BFS_template from "./components/DSA/Trees/BFS/BFS_template";
 import DFS_template from "./components/DSA/Trees/DFS/DFS_template";
@@ -30,7 +30,7 @@ const routes = [
 
       // NEW: This route is the main page for the Array Visualizer workbench.
       // Clicking the "Arrays" card on the dashboard should navigate to this path.
-
+      { path: "/dashboard/Roadmap", element: <Roadmap /> },
       // These are the specific algorithm pages that you will link to from the ArrayVisualizer page.
       { path: "/components/arrays/Bsearch", element: <BNS_template /> },
       { path: "/components/arrays/Lsearch", element: <LS_template /> },
