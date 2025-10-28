@@ -40,11 +40,11 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import GroupWorkIcon from '@mui/icons-material/GroupWork';
 import LockIcon from '@mui/icons-material/Lock';
 
-// Assuming these components exist. Replace with placeholders if needed.
-// import QOP from './QOP';
-// import QOP_Monoco from './QOP_Monoco';
-// import { useScrollToTop } from 'app/hooks/useScrollToTop';
-const useScrollToTop = () => { }; // Mock hook
+
+import QOP from './QOP';
+import QOP_Monoco from './QOP_Monoco';
+import { useScrollToTop } from 'app/hooks/useScrollToTop';
+
 
 const LockOverlay = () => (
   <Box
@@ -231,8 +231,8 @@ const QOP_template = () => {
             </Box>
           </Paper>
         );
-      case 'simulation': return <Paper sx={{ p: 3 }}><Typography>Simulation (QOP) component goes here.</Typography></Paper>;
-      case 'Code': return <Paper sx={{ p: 3 }}><Typography>Code (QOP_Monoco) component goes here.</Typography></Paper>;
+      case 'simulation': return <QOP showSnackbar={showSnackbar} />;
+      case 'Code': return <QOP_Monoco showSnackbar={showSnackbar} />;
       case 'quiz':
         return (
           <Paper elevation={0} sx={{ p: 3, borderRadius: 2, bgcolor: '#f8fafc' }}>
